@@ -8,4 +8,6 @@ export const props = {
   caption,
   logoSrc,
   token,
+  captchaEnabled: false,
+  captchaNewUrl: null,
 };

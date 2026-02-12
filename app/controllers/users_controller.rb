@@ -142,6 +142,18 @@ class UsersController < ApplicationController
     end
 
     if request.post?
+      # Verify CAPTCHA if enabled (simple_captcha2 expects params[:captcha] and params[:captcha_key])
+      if Setting[:captcha_enabled]
+        params[:captcha] = params.dig(:login, :captcha)
+        params[:captcha_key] = params.dig(:login, :captcha_key)
+        unless simple_captcha_valid?
+          inline_error _("CAPTCHA verification failed. Please try again.")
+          logger.warn("CAPTCHA verification failed from #{request.remote_ip} with username '#{params[:login].try(:[], 'login')}'")
+          redirect_to login_users_path
+          return
+        end
+      end
+
       backup_session_content { reset_session }
       intercept = SSO::FormIntercept.new(self)
       if intercept.available? && intercept.authenticated?

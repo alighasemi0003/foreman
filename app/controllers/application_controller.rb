@@ -1,5 +1,6 @@
 class ApplicationController < ActionController::Base
   include ApplicationShared
+  include SimpleCaptcha::ControllerHelpers
 
   include Foreman::Controller::Flash
   include Foreman::Controller::Authorize
