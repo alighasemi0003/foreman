@@ -10,9 +10,9 @@ module LoginHelper
       captchaEnabled: captcha_enabled,
     }
 
-    # simple_captcha2: React fetches a new captcha from this URL (returns captcha_key + captcha_image_url)
-    if captcha_enabled
-      props[:captchaNewUrl] = captcha_new_path
+    # Simple math CAPTCHA: question is generated in UsersController#login and stored in session
+    if captcha_enabled && session[:captcha_question]
+      props[:captchaQuestion] = session[:captcha_question]
     end
 
     props

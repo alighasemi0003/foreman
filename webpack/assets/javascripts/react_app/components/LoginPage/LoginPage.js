@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   LoginPage as PF5LoginPage,
@@ -22,15 +22,13 @@ const LoginPage = ({
   logoSrc,
   token,
   captchaEnabled,
-  captchaNewUrl,
+  captchaQuestion,
 }) => {
   const { modifiedAlerts, submitErrors } = adjustAlerts(alerts);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [captchaCode, setCaptchaCode] = useState('');
-  const [captchaKey, setCaptchaKey] = useState('');
-  const [captchaImageUrl, setCaptchaImageUrl] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [isLoginDisabled, setIsLoginDisabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [alertArr, setAlertArr] = useState(modifiedAlerts);
@@ -39,37 +37,18 @@ const LoginPage = ({
     setAlertArr(other);
   };
 
-  const fetchNewCaptcha = () => {
-    if (!captchaNewUrl) return;
-    setCaptchaCode('');
-    fetch(captchaNewUrl)
-      .then(res => res.json())
-      .then(data => {
-        setCaptchaKey(data.captcha_key || '');
-        setCaptchaImageUrl(data.captcha_image_url || '');
-      })
-      .catch(() => {
-        setCaptchaKey('');
-        setCaptchaImageUrl('');
-      });
-  };
-
-  useEffect(() => {
-    if (captchaEnabled && captchaNewUrl) fetchNewCaptcha();
-  }, [captchaEnabled, captchaNewUrl]);
-
   const handleUsernameChange = (_event, value) => {
     setUsername(value);
-    validateForm(value, password, captchaCode);
+    validateForm(value, password, captchaAnswer);
   };
 
   const handlePasswordChange = (_event, value) => {
     setPassword(value);
-    validateForm(username, value, captchaCode);
+    validateForm(username, value, captchaAnswer);
   };
 
   const handleCaptchaChange = (_event, value) => {
-    setCaptchaCode(value);
+    setCaptchaAnswer(value);
     validateForm(username, password, value);
   };
 
@@ -80,8 +59,9 @@ const LoginPage = ({
     setIsLoginDisabled(!(hasUsername && hasPassword && hasCaptcha));
   };
 
-  const refreshCaptchaImage = () => {
-    fetchNewCaptcha();
+  const refreshCaptcha = () => {
+    // Reload page to get a new CAPTCHA question
+    window.location.reload();
   };
 
   const handleSubmit = () => {
@@ -139,39 +119,34 @@ const LoginPage = ({
           {...defaultFormProps.passwordField}
         />
       </FormGroup>
-      {captchaEnabled && captchaNewUrl && (
+      {captchaEnabled && captchaQuestion && (
         <FormGroup
           isRequired
           fieldId="captcha"
           label={__('CAPTCHA')}
-          helperText={__('Enter the characters shown in the image')}
+          helperText={__('Solve the math problem')}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            {captchaImageUrl ? (
-              <img
-                src={captchaImageUrl}
-                alt={__('CAPTCHA image')}
-                style={{ border: '1px solid #ccc', borderRadius: '4px' }}
-              />
-            ) : null}
+            <div style={{ fontSize: '16px', fontWeight: 'bold', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: '#f5f5f5' }}>
+              {captchaQuestion}
+            </div>
             <Button
               variant="link"
-              onClick={refreshCaptchaImage}
+              onClick={refreshCaptcha}
               aria-label={__('Refresh CAPTCHA')}
             >
               {__('Refresh')}
             </Button>
           </div>
-          <input type="hidden" name="login[captcha_key]" value={captchaKey} />
           <TextInput
             ouiaId="login-captcha"
             isRequired
             type="text"
-            value={captchaCode}
+            value={captchaAnswer}
             onChange={handleCaptchaChange}
-            id="login_captcha"
-            name="login[captcha]"
-            placeholder={__('Enter CAPTCHA code')}
+            id="login_captcha_answer"
+            name="login[captcha_answer]"
+            placeholder={__('Enter your answer')}
             autoComplete="off"
             maxLength={10}
           />
@@ -220,7 +195,7 @@ LoginPage.propTypes = {
   logoSrc: PropTypes.string,
   token: PropTypes.string.isRequired,
   captchaEnabled: PropTypes.bool,
-  captchaNewUrl: PropTypes.string,
+  captchaQuestion: PropTypes.string,
 };
 
 LoginPage.defaultProps = {
@@ -229,7 +204,7 @@ LoginPage.defaultProps = {
   caption: null,
   logoSrc: null,
   captchaEnabled: false,
-  captchaNewUrl: null,
+  captchaQuestion: null,
 };
 
 export default LoginPage;

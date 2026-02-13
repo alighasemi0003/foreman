@@ -243,9 +243,6 @@ Foreman::Application.routes.draw do
 
   get 'menu', to: 'user_menus#menu'
 
-  # CAPTCHA routes (simple_captcha2)
-  get 'captcha/new', to: 'captcha#new', as: 'captcha_new'
-
   resources :users, except: [:show] do
     collection do
       get 'login'

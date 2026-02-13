@@ -9,5 +9,5 @@ export const props = {
   logoSrc,
   token,
   captchaEnabled: false,
-  captchaNewUrl: null,
+  captchaQuestion: null,
 };

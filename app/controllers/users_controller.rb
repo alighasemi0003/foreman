@@ -142,16 +142,20 @@ class UsersController < ApplicationController
     end
 
     if request.post?
-      # Verify CAPTCHA if enabled (simple_captcha2 expects params[:captcha] and params[:captcha_key])
+      # Verify CAPTCHA if enabled (simple math CAPTCHA)
       if Setting[:captcha_enabled]
-        params[:captcha] = params.dig(:login, :captcha)
-        params[:captcha_key] = params.dig(:login, :captcha_key)
-        unless simple_captcha_valid?
-          inline_error _("CAPTCHA verification failed. Please try again.")
+        captcha_answer = params.dig(:login, :captcha_answer)
+        unless captcha_answer.present? && captcha_answer.to_s.strip == session[:captcha_ans].to_s
+          inline_error _("Captcha answer is incorrect")
           logger.warn("CAPTCHA verification failed from #{request.remote_ip} with username '#{params[:login].try(:[], 'login')}'")
+          # Regenerate CAPTCHA for retry
+          generate_captcha_question
           redirect_to login_users_path
           return
         end
+        # Clear CAPTCHA after successful validation
+        session.delete(:captcha_ans)
+        session.delete(:captcha_question)
       end
 
       backup_session_content { reset_session }
@@ -178,6 +182,9 @@ class UsersController < ApplicationController
         login_user(user)
       end
     else
+      # Generate CAPTCHA question for GET request (login page display)
+      generate_captcha_question if Setting[:captcha_enabled]
+      
       if params[:status] && params[:status] == "401"
         render :layout => 'login', :status => params[:status]
       else
@@ -276,5 +283,15 @@ class UsersController < ApplicationController
     raise exception unless request.post? && action_name == 'login'
     inline_warning _("CSRF protection token expired, please log in again")
     redirect_to login_users_path
+  end
+
+  def generate_captcha_question
+    # Generate simple math question: two random numbers between 1 and 9
+    num1 = rand(1..9)
+    num2 = rand(1..9)
+    
+    # Store answer in session
+    session[:captcha_ans] = num1 + num2
+    session[:captcha_question] = "What is #{num1} + #{num2}?"
   end
 end
