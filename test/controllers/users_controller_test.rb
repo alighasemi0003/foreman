@@ -433,6 +433,7 @@ class UsersControllerTest < ActionController::TestCase
     assert_equal users(:admin).id, session[:user]
     users(:admin).reload
     assert users(:admin).last_login_on.to_i >= time.to_i, 'User last login on was not updated'
+    assert users(:admin).has_active_session?, 'User should have an active session after login'
   end
 
   test "check_active_session logs out users whose active session was terminated" do

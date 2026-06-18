@@ -82,6 +82,7 @@ class ActiveSupport::TestCase
 
   def set_session_user(user = :admin)
     user = user.is_a?(User) ? user : users(user)
+    user.update_column(:has_active_session, true) unless user.has_active_session?
     {:user => user.id, :expires_at => 5.minutes.from_now}
   end
 

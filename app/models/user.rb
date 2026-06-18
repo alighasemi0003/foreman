@@ -313,6 +313,7 @@ class User < ApplicationRecord
     User.as_anonymous_admin do
       update_columns(:last_login_on => Time.now.utc)
       ensure_default_role
+      claim_active_session
     end
     User.current = self
   end
@@ -326,6 +327,27 @@ class User < ApplicationRecord
   def release_active_session
     self.class.unscoped.where(:id => id).update_all(:has_active_session => false)
     self.has_active_session = false
+  end
+
+  def terminate_active_sessions!
+    self.class.terminate_active_sessions_for([id])
+  end
+
+  def self.terminate_active_sessions_for(user_ids)
+    user_ids = Array(user_ids).compact.map(&:to_i).uniq
+    return if user_ids.blank?
+
+    unscoped.where(:id => user_ids).update_all(:has_active_session => false)
+    delete_stored_sessions_for_users(user_ids)
+  end
+
+  def self.delete_stored_sessions_for_users(user_ids)
+    require 'active_record/session_store/session'
+    ActiveRecord::SessionStore::Session.find_each do |stored_session|
+      data = stored_session.data
+      user_id = data['user'] || data[:user]
+      stored_session.delete if user_ids.include?(user_id.to_i)
+    end
   end
 
   def self.find_or_create_external_user(attrs, auth_source_name)

@@ -108,6 +108,7 @@ module Foreman::Controller::Authentication
       set_activity_time
     else
       backup_session_content { reset_session }
+      user.claim_active_session
       session[:user] = user.id
       update_activity_time
     end

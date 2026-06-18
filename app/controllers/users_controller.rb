@@ -82,6 +82,7 @@ class UsersController < ApplicationController
     if session[:impersonated_by].blank?
       session[:impersonated_by] = User.current.id
       User.impersonator = User.current
+      user.claim_active_session
       session[:user] = user.id
       success _("You impersonated user %s, to cancel the session, click the impersonation icon in the top bar.") % user.name
       Audit.create :auditable_type => 'User', :auditable_id => user.id, :user_id => User.current.id, :action => 'impersonate', :audited_changes => {}
@@ -203,7 +204,9 @@ class UsersController < ApplicationController
 
     TopbarSweeper.expire_cache
     sso_logout_path = get_sso_method.try(:logout_url)
-    logger.info("User '#{User.unscoped.find_by_id(session[:user]).try(:login) || session[:user]}' logged out")
+    user = User.unscoped.find_by_id(session[:user])
+    logger.info("User '#{user.try(:login) || session[:user]}' logged out")
+    user&.release_active_session
     session[:user] = @user = User.current = nil
     if flash[:success] || flash[:info] || flash[:error]
       flash.keep
@@ -242,6 +245,7 @@ class UsersController < ApplicationController
 
   def login_user(user)
     logger.info("User '#{user.login}' logged in from '#{request.ip}'")
+    user.claim_active_session
     session[:user]         = user.id
     uri                    = session.to_hash.with_indifferent_access[:original_uri]
     session[:original_uri] = nil

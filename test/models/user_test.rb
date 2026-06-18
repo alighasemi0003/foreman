@@ -1390,4 +1390,36 @@ class UserTest < ActiveSupport::TestCase
       assert_equal user.id_and_type, Setting[:host_owner]
     end
   end
+
+  context 'active session tracking' do
+    test 'claim_active_session marks user as logged in' do
+      user = FactoryBot.create(:user)
+      refute user.has_active_session?
+
+      assert user.claim_active_session
+      assert user.has_active_session?
+      refute user.claim_active_session
+    end
+
+    test 'release_active_session clears active session flag' do
+      user = FactoryBot.create(:user)
+      user.claim_active_session
+
+      user.release_active_session
+
+      refute user.reload.has_active_session?
+    end
+
+    test 'terminate_active_sessions_for clears sessions for users' do
+      require 'active_record/session_store/session'
+      user = FactoryBot.create(:user)
+      user.update_column(:has_active_session, true)
+      ActiveRecord::SessionStore::Session.create!(:session_id => 'terminate-me', :data => { :user => user.id }, :updated_at => Time.current)
+
+      User.terminate_active_sessions_for([user.id])
+
+      refute user.reload.has_active_session?
+      refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'terminate-me')
+    end
+  end
 end
