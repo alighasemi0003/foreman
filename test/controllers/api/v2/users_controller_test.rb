@@ -435,4 +435,29 @@ class Api::V2::UsersControllerTest < ActionController::TestCase
     end
     assert_response :unprocessable_entity
   end
+
+  context 'password change required' do
+    test 'API can set password_change_required for internal users' do
+      post :create, params: {
+        :user => min_valid_attrs.merge(:password_change_required => true),
+      }
+      assert_response :success
+      user = User.unscoped.find_by_login(min_valid_attrs[:login])
+      assert user.password_change_required?
+    end
+
+    test 'API response includes password_change_required' do
+      user = FactoryBot.create(:user, :password_change_required => true)
+      get :show, params: { :id => user.id }
+      assert_response :success
+      assert JSON.parse(@response.body)['password_change_required']
+    end
+
+    test 'API rejects password_change_required for external users' do
+      user = users(:one)
+      put :update, params: { :id => user.id, :user => { :password_change_required => true } }
+      assert_response :unprocessable_entity
+      refute user.reload.password_change_required?
+    end
+  end
 end

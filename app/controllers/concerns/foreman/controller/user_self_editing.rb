@@ -4,7 +4,7 @@ module Foreman::Controller::UserSelfEditing
   protected
 
   def editing_self?
-    @editing_self ||= User.current.editing_self?(editing_self_params)
+    @editing_self ||= User.current&.editing_self?(editing_self_params) || false
   end
 
   def editing_self_params

@@ -1422,4 +1422,79 @@ class UserTest < ActiveSupport::TestCase
       refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'terminate-me')
     end
   end
+
+  context 'password change required' do
+    test 'password_change_required defaults to false' do
+      user = FactoryBot.create(:user)
+      refute user.password_change_required?
+    end
+
+    test 'requires_password_change? is true for internal user with flag set' do
+      user = FactoryBot.create(:user, :password_change_required => true)
+      assert user.internal?
+      assert user.requires_password_change?
+    end
+
+    test 'requires_password_change? is false for internal user without flag' do
+      user = FactoryBot.create(:user, :password_change_required => false)
+      refute user.requires_password_change?
+    end
+
+    test 'requires_password_change? is false for external user even with flag in database' do
+      user = users(:one)
+      user.update_column(:password_change_required, true)
+      refute user.internal?
+      refute user.requires_password_change?
+    end
+
+    test 'requires_password_change? is false for FreeIPA-style LDAP user with flag in database' do
+      user = users(:one)
+      assert user.auth_source.is_a?(AuthSourceLdap)
+      user.update_column(:password_change_required, true)
+      refute user.requires_password_change?
+    end
+
+    test 'password_change_required cannot be set for external users' do
+      user = users(:one)
+      user.password_change_required = true
+      refute user.valid?
+      assert_includes user.errors[:password_change_required], 'can only be set for users authenticated internally by Foreman'
+    end
+
+    test 'successful self password change clears password_change_required' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      User.current = user
+      user.password = 'Newpass1!'
+      user.password_confirmation = 'Newpass1!'
+      user.current_password = 'Password1!'
+      assert user.save
+      refute user.password_change_required?
+    end
+
+    test 'failed password change keeps password_change_required' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      User.current = user
+      user.password = 'Newpass1!'
+      user.password_confirmation = 'Wrongpass1!'
+      user.current_password = 'Password1!'
+      refute user.save
+      assert user.reload.password_change_required?
+    end
+
+    test 'admin password reset does not clear password_change_required automatically' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      User.current = users(:admin)
+      user.password = 'Another1!'
+      user.password_confirmation = 'Another1!'
+      assert user.save
+      assert user.password_change_required?
+    end
+
+    test 'auth source change to external clears password_change_required' do
+      user = FactoryBot.create(:user, :password_change_required => true)
+      user.auth_source = auth_sources(:one)
+      assert user.save
+      refute user.password_change_required?
+    end
+  end
 end

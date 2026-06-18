@@ -62,6 +62,7 @@ module Api
         param :locale, FastGettext.available_locales, :required => false, :desc => N_("User's preferred locale")
         param :role_ids, Array, :require => false
         param :mail_enabled, :bool, :desc => N_("Enable user's email")
+        param :password_change_required, :bool, :desc => N_("Require password change on next login. Applies only to users authenticated internally by Foreman.")
         param_group :taxonomies, ::Api::V2::BaseController
         param :ui_compact_mode, :bool, :desc => N_("Use compact UI")
       end

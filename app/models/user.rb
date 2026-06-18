@@ -108,12 +108,14 @@ class User < ApplicationRecord
   validate :name_used_in_a_usergroup, :ensure_hidden_users_are_not_renamed, :ensure_hidden_users_remain_admin,
     :ensure_privileges_not_escalated, :default_organization_inclusion, :default_location_inclusion,
     :ensure_last_admin_remains_admin, :hidden_authsource_restricted, :ensure_admin_password_changed_by_admin,
-    :check_permissions_for_changing_login, :ensure_not_disabling_itself
+    :check_permissions_for_changing_login, :ensure_not_disabling_itself,
+    :password_change_required_only_for_internal_users
   before_validation :verify_current_password, :if => proc { |user| user == User.current },
                     :unless => proc { |user| user.password.empty? }
   before_validation :prepare_password, :normalize_mail
   before_save       :set_lower_login
   before_save       :normalize_timezone
+  before_save       :reset_password_change_required_for_external_users
   before_save :invalidate_cache
 
   after_create :welcome_mail
@@ -164,9 +166,10 @@ class User < ApplicationRecord
     property :mail, String, desc: 'Returns the user mail'
     property :last_login_on, 'ActiveSupport::TimeWithZone', desc: 'Returns the user last login time, in UTC time zone'
     property :disabled, one_of: [true, false], desc: 'Returns true if the user account is disabled, false otherwise'
+    property :password_change_required, one_of: [true, false], desc: 'Returns true if an internal user must change their password on next login'
   end
   class Jail < ::Safemode::Jail
-    allow :id, :login, :ssh_keys, :ssh_authorized_keys, :description, :firstname, :lastname, :mail, :last_login_on, :disabled
+    allow :id, :login, :ssh_keys, :ssh_authorized_keys, :description, :firstname, :lastname, :mail, :last_login_on, :disabled, :password_change_required
   end
 
   # we need to allow self-editing and self-updating
@@ -219,6 +222,10 @@ class User < ApplicationRecord
 
   def internal?
     auth_source.is_a? AuthSourceInternal
+  end
+
+  def requires_password_change?
+    password_change_required? && internal?
   end
 
   def to_label
@@ -647,6 +654,7 @@ class User < ApplicationRecord
     if password.present?
       self.password_salt = salt_password
       self.password_hash = hash_password(password)
+      self.password_change_required = false if internal? && User.current == self
     end
   end
 
@@ -804,5 +812,15 @@ class User < ApplicationRecord
     if disabled? && self == User.current
       errors.add :disabled, _('It is not possible to disable yourself')
     end
+  end
+
+  def password_change_required_only_for_internal_users
+    if password_change_required? && !internal?
+      errors.add :password_change_required, _('can only be set for users authenticated internally by Foreman')
+    end
+  end
+
+  def reset_password_change_required_for_external_users
+    self.password_change_required = false unless internal?
   end
 end

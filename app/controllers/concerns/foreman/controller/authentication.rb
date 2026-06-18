@@ -55,6 +55,29 @@ module Foreman::Controller::Authentication
     true
   end
 
+  def require_password_change
+    user = User.current
+    return true unless user&.requires_password_change?
+    return true if password_change_allowed_request?
+
+    respond_to do |format|
+      format.html do
+        warning _('You must change your password before continuing.')
+        redirect_to main_app.edit_user_path(:id => user)
+      end
+      format.any { head :forbidden }
+    end
+    false
+  end
+
+  def password_change_allowed_request?
+    path = path_to_authenticate
+    return true if path[:controller] == 'users' && path[:action] == 'logout'
+    return true if User.current&.editing_self?(path)
+
+    false
+  end
+
   def authorized
     User.current.allowed_to?(path_to_authenticate)
   end

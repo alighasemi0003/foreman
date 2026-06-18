@@ -61,6 +61,11 @@
                                    :verify => {name: 'user[password_confirmation]', :error => f.object.errors[:password_confirmation].present? ? f.object.errors[:password_confirmation].to_sentence : false},
                                    :error => f.object.errors[:password_hash].present? ? f.object.errors[:password_hash].to_sentence : false,
                                    :required => f.object.new_record? }}) %>
+        <% unless @editing_self %>
+          <%= checkbox_f f, :password_change_required,
+                         :label => _('Require password change on next login'),
+                         :label_help => _('Applies only to internal users whose password is managed by Foreman. For FreeIPA, LDAP, SSO, or other external authentication sources, password policy is managed by the external identity provider.') %>
+        <% end %>
       </div>
     </div>
 

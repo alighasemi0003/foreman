@@ -673,4 +673,110 @@ class UsersControllerTest < ActionController::TestCase
       assert flash[:inline][:error].present?
     end
   end
+
+  context 'password change required' do
+    test 'admin can set password_change_required for internal user on create' do
+      post :create, params: {
+        :user => {
+          :login => 'pwchangeuser',
+          :mail => 'pwchange@example.com',
+          :auth_source_id => auth_sources(:internal).id,
+          :password => 'Password1!',
+          :password_change_required => true,
+        },
+      }, session: set_session_user
+      assert_redirected_to users_path
+      assert User.unscoped.find_by_login('pwchangeuser').password_change_required?
+    end
+
+    test 'internal user with password_change_required is redirected to password change after login' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      post :login, params: { :login => {'login' => user.login, 'password' => 'Password1!'} }
+      assert_redirected_to edit_user_path(user)
+    end
+
+    test 'internal user without password_change_required logs in normally' do
+      post :login, params: { :login => {'login' => users(:admin).login, 'password' => 'secret'} }
+      assert_redirected_to ApplicationHelper.current_hosts_path
+    end
+
+    test 'external user with password_change_required in database logs in normally' do
+      user = users(:one)
+      user.update_column(:password_change_required, true)
+      AuthSourceLdap.any_instance.stubs(:authenticate).returns(user)
+      post :login, params: { :login => {'login' => user.login, 'password' => 'password'} }
+      assert_redirected_to ApplicationHelper.current_hosts_path
+    end
+
+    test 'internal user with password_change_required cannot access protected pages' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      user.claim_active_session
+      get :index, session: set_session_user(user)
+      assert_redirected_to edit_user_path(user)
+    end
+
+    test 'internal user with password_change_required can access password change page' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      user.claim_active_session
+      get :edit, params: { :id => user.id }, session: set_session_user(user)
+      assert_response :success
+    end
+
+    test 'internal user with password_change_required can logout' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      user.claim_active_session
+      @controller.expects(:verify_authenticity_token).returns(true)
+      post :logout, session: set_session_user(user)
+      assert_response :found
+    end
+
+    test 'successful password change clears password_change_required' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      user.claim_active_session
+      put :update, params: {
+        :id => user.id,
+        :user => {
+          :current_password => 'Password1!',
+          :password => 'Newpass1!',
+          :password_confirmation => 'Newpass1!',
+        },
+      }, session: set_session_user(user)
+      assert_response :redirect
+      refute user.reload.password_change_required?
+    end
+
+    test 'failed password change keeps password_change_required' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      user.claim_active_session
+      put :update, params: {
+        :id => user.id,
+        :user => {
+          :current_password => 'Password1!',
+          :password => 'Newpass1!',
+          :password_confirmation => 'Wrongpass1!',
+        },
+      }, session: set_session_user(user)
+      assert_template :edit
+      assert user.reload.password_change_required?
+    end
+
+    test 'admin can clear password_change_required for internal user' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      put :update, params: {
+        :id => user.id,
+        :user => { :password_change_required => false, :mail => user.mail },
+      }, session: set_session_user
+      refute user.reload.password_change_required?
+    end
+
+    test 'user cannot clear password_change_required without changing password' do
+      user = FactoryBot.create(:user, :password => 'Password1!', :password_change_required => true)
+      user.claim_active_session
+      put :update, params: {
+        :id => user.id,
+        :user => { :password_change_required => false, :mail => user.mail },
+      }, session: set_session_user(user)
+      assert user.reload.password_change_required?
+    end
+  end
 end

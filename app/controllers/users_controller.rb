@@ -7,7 +7,7 @@ class UsersController < ApplicationController
 
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
-  skip_before_action :require_login, :check_user_enabled, :check_active_session, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
+  skip_before_action :require_login, :check_user_enabled, :check_active_session, :require_password_change, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
   skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
@@ -245,6 +245,7 @@ class UsersController < ApplicationController
 
   def login_user(user)
     logger.info("User '#{user.login}' logged in from '#{request.ip}'")
+    User.current = user
     user.claim_active_session
     session[:user]         = user.id
     uri                    = session.to_hash.with_indifferent_access[:original_uri]
@@ -253,7 +254,12 @@ class UsersController < ApplicationController
     store_default_taxonomy(user, 'location') unless session.has_key?(:location_id)
     TopbarSweeper.expire_cache
     telemetry_increment_counter(:successful_ui_logins)
-    redirect_to (uri || helpers.current_hosts_path)
+    if user.requires_password_change?
+      warning _('You must change your password before continuing.')
+      redirect_to edit_user_path(user)
+    else
+      redirect_to (uri || helpers.current_hosts_path)
+    end
   end
 
   def parameter_filter_context
