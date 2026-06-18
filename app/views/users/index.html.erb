@@ -1,10 +1,10 @@
 <% title _("Users") %>
 
-<% title_actions new_link(_("Create User")), link_to(_("Invalidate JWTs for all users"),
-    hash_for_invalidate_jwt_for_all_users_users_path.merge(:auth_object => User.current, :permission => "edit_users"),
+<% title_actions new_link(_("Create User")), display_link_if_authorized(_("Terminate Sessions for all users"),
+    {:controller => 'users', :action => 'terminate_active_sessions_for_all_users'}.merge(:auth_object => User.current, :permission => "edit_users"),
     :class => "btn btn-default",
     :method => :delete,
-    :data => { :confirm => _("Invalidate all JSON Web Tokens for all users?")} ) %>
+    :data => { :confirm => _("Terminate active sessions for all users?")} ) %>
 
 <table class="<%= table_css_classes 'table-fixed' %>">
   <thead>
@@ -15,6 +15,7 @@
       <th><%= sort :mail, :as => s_("User|Mail") %></th>
       <th><%= sort :admin, :as => s_("User|Admin") %></th>
       <th><%= sort :last_login_on, :as => s_("User|Last login on"), :default => 'DESC' %></th>
+      <th><%= s_("User|Active session") %></th>
       <th><%= _("Authorized by") %></th>
       <th class="col-md-1"><%= _('Actions') %></th>
     </tr>
@@ -28,6 +29,7 @@
         <td class="ellipsis"><%= user.mail %></td>
         <td><%= checked_icon user.admin? %></td>
         <td class="ellipsis"><%= date_time_relative(user.last_login_on)%></td>
+        <td><%= checked_icon user.has_active_session? %></td>
         <td class="ellipsis"><%= auth_source_column(user) %></td>
         <td><%= user_action_buttons(user) %></td>
       </tr>

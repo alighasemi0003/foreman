@@ -3,7 +3,7 @@ class UsergroupsController < ApplicationController
   include Foreman::Controller::Parameters::Usergroup
   include Foreman::Controller::ExternalUsergroupsErrors
 
-  before_action :find_resource, :only => [:edit, :update, :destroy]
+  before_action :find_resource, :only => [:edit, :update, :destroy, :terminate_active_sessions]
   before_action :get_external_usergroups_to_refresh, :only => [:update]
 
   def index
@@ -50,6 +50,12 @@ class UsergroupsController < ApplicationController
     else
       process_error
     end
+  end
+
+  def terminate_active_sessions
+    user_ids = @usergroup.all_users.map(&:id)
+    User.terminate_active_sessions_for(user_ids)
+    process_success(:success_msg => _('Successfully terminated active sessions for user group %s.') % @usergroup.name)
   end
 
   private

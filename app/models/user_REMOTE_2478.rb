@@ -1,7 +1,7 @@
 require 'digest/sha1'
 
 class User < ApplicationRecord
-  audited :except => [:last_login_on, :password_hash, :password_salt, :password_confirmation],
+  audited :except => [:last_login_on, :has_active_session, :password_hash, :password_salt, :password_confirmation],
     :associations => [:roles, :usergroups]
   include Authorizable
   include Foreman::TelemetryHelper
@@ -20,6 +20,8 @@ class User < ApplicationRecord
   ANONYMOUS_ADMIN = 'foreman_admin'
   ANONYMOUS_API_ADMIN = 'foreman_api_admin'
   ANONYMOUS_CONSOLE_ADMIN = 'foreman_console_admin'
+
+  class ActiveSessionError < StandardError; end
 
   validates_lengths_from_database :except => [:firstname, :lastname, :format, :mail, :login]
   attr_accessor :password_confirmation, :current_password
@@ -257,7 +259,7 @@ class User < ApplicationRecord
   # If the user is not in the DB then try to login the user on each available authentication source
   # If this succeeds then copy the user's details from the authentication source into the User table
   # Returns : User object OR nil
-  def self.try_to_login(login, password, api_request = false)
+  def self.try_to_login(login, password, api_request = false, enforce_single_session: false)
     # Make sure no one can sign in with an empty password
     return nil if password.to_s.empty?
 
@@ -300,6 +302,10 @@ class User < ApplicationRecord
       user = try_to_auto_create_user(login, password)
     end
     if user
+      if enforce_single_session && !user.disabled? && !user.claim_active_session
+        User.current = nil
+        raise ActiveSessionError, N_("You already have an active session elsewhere.")
+      end
       user.post_successful_login
     else
       logger.info "invalid user"
@@ -326,6 +332,33 @@ class User < ApplicationRecord
   def release_active_session
     self.class.unscoped.where(:id => id).update_all(:has_active_session => false)
     self.has_active_session = false
+  end
+
+  def self.destroy_stored_sessions_for(user_ids)
+    user_ids = Array(user_ids).map(&:to_i).uniq
+    return 0 if user_ids.empty?
+
+    destroyed = 0
+    ActiveRecord::SessionStore::Session.find_each do |stored_session|
+      session_user_id = stored_session.data.with_indifferent_access[:user]
+      next unless user_ids.include?(session_user_id)
+
+      stored_session.destroy
+      destroyed += 1
+    rescue
+      nil
+    end
+    destroyed
+  end
+
+  def self.terminate_active_sessions_for(user_ids)
+    user_ids = Array(user_ids).map(&:to_i).uniq
+    destroy_stored_sessions_for(user_ids)
+    unscoped.where(:id => user_ids).update_all(:has_active_session => false)
+  end
+
+  def terminate_active_sessions!
+    self.class.terminate_active_sessions_for(id)
   end
 
   def self.find_or_create_external_user(attrs, auth_source_name)

@@ -42,15 +42,14 @@ services:
       redis-tasks:
         condition: service_started
     ports:
-      - "3000:3000"
+      - "${MY_DOCKER_IP:-127.0.0.1}:3000:3000"
+      - "${MY_DOCKER_IP:-127.0.0.1}:5910-5930:5910-5930"
     restart: always
     volumes:
       - ./app:/home/foreman/app
       - ./db/migrate:/home/foreman/db/migrate
       - ./lib:/home/foreman/lib
       - ./extras:/home/foreman/extras
-      - ./config/routes.rb:/home/foreman/config/routes.rb
-      - ./config/initializers/f_foreman_permissions.rb:/home/foreman/config/initializers/f_foreman_permissions.rb
 
   orchestrator:
     <<: *app_base

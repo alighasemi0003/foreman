@@ -317,6 +317,8 @@ class User < ApplicationRecord
     User.current = self
   end
 
+<<<<<<< HEAD
+=======
   def claim_active_session
     claimed = self.class.unscoped.where(:id => id, :has_active_session => false).update_all(:has_active_session => true) == 1
     self.has_active_session = true if claimed
@@ -328,6 +330,34 @@ class User < ApplicationRecord
     self.has_active_session = false
   end
 
+  def self.destroy_stored_sessions_for(user_ids)
+    user_ids = Array(user_ids).map(&:to_i).uniq
+    return 0 if user_ids.empty?
+
+    destroyed = 0
+    ActiveRecord::SessionStore::Session.find_each do |stored_session|
+      session_user_id = stored_session.data.with_indifferent_access[:user]
+      next unless user_ids.include?(session_user_id)
+
+      stored_session.destroy
+      destroyed += 1
+    rescue
+      nil
+    end
+    destroyed
+  end
+
+  def self.terminate_active_sessions_for(user_ids)
+    user_ids = Array(user_ids).map(&:to_i).uniq
+    destroy_stored_sessions_for(user_ids)
+    unscoped.where(:id => user_ids).update_all(:has_active_session => false)
+  end
+
+  def terminate_active_sessions!
+    self.class.terminate_active_sessions_for(id)
+  end
+
+>>>>>>> cbdc82efe (Terminate token)
   def self.find_or_create_external_user(attrs, auth_source_name)
     external_groups = attrs.delete(:groups)
     auth_source = AuthSource.find_by_name(auth_source_name.to_s)

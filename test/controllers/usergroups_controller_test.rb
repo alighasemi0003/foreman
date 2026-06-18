@@ -43,6 +43,21 @@ class UsergroupsControllerTest < ActionController::TestCase
     assert !Usergroup.exists?(usergroup.id)
   end
 
+  test 'admin can terminate active sessions for all users in a user group' do
+    require 'active_record/session_store/session'
+    usergroup = Usergroup.first
+    user = users(:two)
+    usergroup.users << user
+    user.update_column(:has_active_session, true)
+    ActiveRecord::SessionStore::Session.create!(:session_id => 'group-victim', :data => { :user => user.id }, :updated_at => Time.current)
+
+    patch :terminate_active_sessions, params: { :id => usergroup.id }, session: set_session_user
+
+    assert_redirected_to usergroups_url
+    refute user.reload.has_active_session?
+    refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'group-victim')
+  end
+
   def setup_user
     @request.session[:user] = users(:one).id
     users(:one).roles       = [Role.default, Role.find_by_name('Viewer')]

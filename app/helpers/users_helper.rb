@@ -34,11 +34,11 @@ module UsersHelper
         :data => { :no_turbolink => true })
     end
 
-    if user != User.current
-      additional_actions << display_link_if_authorized(_("Invalidate JWTs"),
-        hash_for_invalidate_jwt_user_path(:id => user.id).merge(:auth_object => user, :permission => "edit_users"),
+    if user != User.current && user.has_active_session?
+      additional_actions << display_link_if_authorized(_("Terminate Session"),
+        {:controller => 'users', :action => 'terminate_active_session', :id => user.id}.merge(:auth_object => user, :permission => "edit_users"),
         :method => :patch, :id => user.id,
-        :data => { :confirm => _("Invalidate all JSON Web Tokens for %s?") % user.name })
+        :data => { :confirm => _("Terminate active session for %s?") % user.name })
     end
 
     delete_btn = display_delete_if_authorized(

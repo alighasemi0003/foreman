@@ -317,17 +317,6 @@ class User < ApplicationRecord
     User.current = self
   end
 
-  def claim_active_session
-    claimed = self.class.unscoped.where(:id => id, :has_active_session => false).update_all(:has_active_session => true) == 1
-    self.has_active_session = true if claimed
-    claimed
-  end
-
-  def release_active_session
-    self.class.unscoped.where(:id => id).update_all(:has_active_session => false)
-    self.has_active_session = false
-  end
-
   def self.find_or_create_external_user(attrs, auth_source_name)
     external_groups = attrs.delete(:groups)
     auth_source = AuthSource.find_by_name(auth_source_name.to_s)

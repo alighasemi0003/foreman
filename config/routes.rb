@@ -239,6 +239,9 @@ Foreman::Application.routes.draw do
     collection do
       get 'auto_complete_search'
     end
+    member do
+      patch 'terminate_active_sessions'
+    end
   end
 
   get 'menu', to: 'user_menus#menu'
@@ -253,11 +256,12 @@ Foreman::Application.routes.draw do
       get 'extlogout'
       get 'auto_complete_search'
       delete 'stop_impersonation'
-      delete 'invalidate_jwt_for_all_users'
+      delete 'terminate_active_sessions_for_all_users'
     end
     member do
       post 'impersonate'
       patch 'invalidate_jwt'
+      patch 'terminate_active_session'
     end
     resources :ssh_keys, only: [:new, :create, :destroy]
   end

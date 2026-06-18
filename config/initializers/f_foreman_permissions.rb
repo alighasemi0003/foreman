@@ -535,7 +535,7 @@ Foreman::AccessControl.map do |permission_set|
     map.permission :create_usergroups, {:usergroups => [:new, :create],
                                          :"api/v2/usergroups" => [:create],
     }
-    map.permission :edit_usergroups, {:usergroups => [:edit, :update],
+    map.permission :edit_usergroups, {:usergroups => [:edit, :update, :terminate_active_sessions],
                                          :"api/v2/usergroups" => [:update],
     }
     map.permission :destroy_usergroups, {:usergroups => [:destroy],
@@ -562,7 +562,7 @@ Foreman::AccessControl.map do |permission_set|
       :users => [:new, :create],
       :"api/v2/users" => [:create]
     map.permission :edit_users,
-      :users => [:edit, :update, :invalidate_jwt, :invalidate_jwt_for_all_users],
+      :users => [:edit, :update, :invalidate_jwt, :terminate_active_session, :terminate_active_sessions_for_all_users],
       :"api/v2/users" => [:update],
       :"api/v2/registration_tokens" => [:invalidate_jwt_tokens, :invalidate_jwt]
     map.permission :destroy_users,

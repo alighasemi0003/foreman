@@ -58,3 +58,4 @@ mkmf.log
 .yardoc/
 webpack/assets/javascripts/all_react_app_exports.js
 .webpack_cache/
+foreman-develop.tar

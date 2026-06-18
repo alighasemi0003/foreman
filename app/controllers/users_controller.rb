@@ -7,7 +7,7 @@ class UsersController < ApplicationController
 
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
-  skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
+  skip_before_action :require_login, :check_user_enabled, :check_active_session, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
   skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
@@ -93,12 +93,10 @@ class UsersController < ApplicationController
     end
   end
 
-  def invalidate_jwt_for_all_users
-    user_ids = User.authorized(:edit_users).ids.uniq
-    JwtSecret.where(user_id: user_ids).destroy_all
-    process_success(
-      :success_msg => _('Successfully invalidated registration tokens for all users.')
-    )
+  def terminate_active_sessions_for_all_users
+    user_ids = User.authorized(:edit_users).where(:has_active_session => true).where.not(:id => User.current.id).ids
+    User.terminate_active_sessions_for(user_ids)
+    process_success(:success_msg => _('Successfully terminated active sessions for all users.'))
   end
 
   def invalidate_jwt
@@ -114,6 +112,17 @@ class UsersController < ApplicationController
         render :json => {}, :status => :ok
       end
     end
+  end
+
+  def terminate_active_session
+    @user = find_resource(:edit_users)
+    if @user == User.current
+      process_error(:error_msg => _('You cannot terminate your own active session from this action.'))
+      return
+    end
+
+    @user.terminate_active_sessions!
+    process_success(:success_msg => _('Successfully terminated active session for %s.') % @user.login)
   end
 
   def stop_impersonation

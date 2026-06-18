@@ -18,10 +18,17 @@
         <td class="ellipsis"><%= usergroup.users.except_hidden.map(&:login).to_sentence %></td>
         <td class="ellipsis"><%= usergroup.usergroups.map(&:name).to_sentence %></td>
         <td>
-          <%= action_buttons(display_delete_if_authorized(
-            hash_for_usergroup_path(:id => usergroup).
-            merge(:auth_object => usergroup, :authorizer => authorizer),
-            :data => { :confirm => (_("Delete %s?") % usergroup.name) } )) %>
+          <%= action_buttons(
+            display_delete_if_authorized(
+              hash_for_usergroup_path(:id => usergroup).
+              merge(:auth_object => usergroup, :authorizer => authorizer),
+              :data => { :confirm => (_("Delete %s?") % usergroup.name) } ),
+            display_link_if_authorized(_("Terminate Sessions"),
+              {:controller => 'usergroups', :action => 'terminate_active_sessions', :id => usergroup.id}.
+              merge(:auth_object => usergroup, :permission => "edit_usergroups"),
+              :method => :patch,
+              :data => { :confirm => _("Terminate active sessions for all users in %s?") % usergroup.name })
+          ) %>
         </td>
       </tr>
     <% end %>

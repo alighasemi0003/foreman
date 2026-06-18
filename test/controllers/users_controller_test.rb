@@ -210,31 +210,36 @@ class UsersControllerTest < ActionController::TestCase
     assert_not_nil user.jwt_secret
   end
 
-  test 'user with edit users permission should be able to invalidate jwt for all authorized users' do
+  test 'user with edit users permission should be able to terminate active sessions for all authorized users' do
+    require 'active_record/session_store/session'
     User.current = setup_user "edit", "users"
-    users = User.except_hidden
-    users.each do |user|
-      FactoryBot.create(:jwt_secret, token: "test_jwt_secret_#{user.id}", user: user)
-    end
-    delete :invalidate_jwt_for_all_users, session: set_session_user(User.current)
-    users.each do |user|
-      user.reload
-      assert_nil user.jwt_secret
-    end
+    users(:two).update_column(:has_active_session, true)
+    users(:internal).update_column(:has_active_session, true)
+    ActiveRecord::SessionStore::Session.create!(:session_id => 'all-users-1', :data => { :user => users(:two).id }, :updated_at => Time.current)
+    ActiveRecord::SessionStore::Session.create!(:session_id => 'all-users-2', :data => { :user => users(:internal).id }, :updated_at => Time.current)
+
+    delete :terminate_active_sessions_for_all_users, session: set_session_user(User.current)
+
+    refute users(:two).reload.has_active_session?
+    refute users(:internal).reload.has_active_session?
+    refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'all-users-1')
+    refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'all-users-2')
     assert_response :redirect
   end
 
-  test 'Admin should be able to invalidate jwt for all authorized users' do
-    User.current = users(:admin)
-    users = User.except_hidden
-    users.each do |user|
-      FactoryBot.create(:jwt_secret, token: "test_jwt_secret_#{user.id}", user: user)
-    end
-    delete :invalidate_jwt_for_all_users, session: set_session_user(User.current)
-    users.each do |user|
-      user.reload
-      assert_nil user.jwt_secret
-    end
+  test 'Admin should be able to terminate active sessions for all authorized users' do
+    require 'active_record/session_store/session'
+    admin = users(:admin)
+    admin.update_column(:has_active_session, true)
+    User.current = admin
+    users(:two).update_column(:has_active_session, true)
+    ActiveRecord::SessionStore::Session.create!(:session_id => 'all-users-admin', :data => { :user => users(:two).id }, :updated_at => Time.current)
+
+    delete :terminate_active_sessions_for_all_users, session: set_session_user(admin)
+
+    refute users(:two).reload.has_active_session?
+    refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'all-users-admin')
+    assert admin.reload.has_active_session?
     assert_response :redirect
   end
 
@@ -428,6 +433,39 @@ class UsersControllerTest < ActionController::TestCase
     assert_equal users(:admin).id, session[:user]
     users(:admin).reload
     assert users(:admin).last_login_on.to_i >= time.to_i, 'User last login on was not updated'
+  end
+
+  test "check_active_session logs out users whose active session was terminated" do
+    user = users(:admin)
+    user.update_column(:has_active_session, false)
+
+    get :index, session: set_session_user(user)
+
+    assert_redirected_to login_users_path
+    assert_equal _("Your session has been terminated."), flash[:inline][:warning]
+  end
+
+  test "admin can terminate active session for another user" do
+    require 'active_record/session_store/session'
+    user = users(:two)
+    user.update_column(:has_active_session, true)
+    ActiveRecord::SessionStore::Session.create!(:session_id => 'victim', :data => { :user => user.id }, :updated_at => Time.current)
+
+    patch :terminate_active_session, params: { :id => user.id }, session: set_session_user(users(:admin))
+
+    assert_redirected_to users_url
+    refute user.reload.has_active_session?
+    refute ActiveRecord::SessionStore::Session.exists?(:session_id => 'victim')
+  end
+
+  test "admin cannot terminate their own active session from user list action" do
+    user = users(:admin)
+    user.update_column(:has_active_session, true)
+
+    patch :terminate_active_session, params: { :id => user.id }, session: set_session_user(user)
+
+    assert_redirected_to users_url
+    assert user.reload.has_active_session?
   end
 
   test "#login resets the session ID to prevent fixation" do
