@@ -16,11 +16,19 @@ import { translate as __ } from '../../common/I18n';
 import { adjustAlerts, defaultFormProps } from './helpers';
 import './LoginPage.scss';
 
-const LoginPage = ({ alerts, caption, logoSrc, token }) => {
+const LoginPage = ({
+  alerts,
+  caption,
+  logoSrc,
+  token,
+  captchaEnabled,
+  captchaQuestion,
+}) => {
   const { modifiedAlerts, submitErrors } = adjustAlerts(alerts);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [isLoginDisabled, setIsLoginDisabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [alertArr, setAlertArr] = useState(modifiedAlerts);
@@ -31,12 +39,29 @@ const LoginPage = ({ alerts, caption, logoSrc, token }) => {
 
   const handleUsernameChange = (_event, value) => {
     setUsername(value);
-    if (value !== '' && password !== '') setIsLoginDisabled(false);
+    validateForm(value, password, captchaAnswer);
   };
 
   const handlePasswordChange = (_event, value) => {
     setPassword(value);
-    if (value !== '' && username !== '') setIsLoginDisabled(false);
+    validateForm(username, value, captchaAnswer);
+  };
+
+  const handleCaptchaChange = (_event, value) => {
+    setCaptchaAnswer(value);
+    validateForm(username, password, value);
+  };
+
+  const validateForm = (user, pass, captcha) => {
+    const hasUsername = user !== '';
+    const hasPassword = pass !== '';
+    const hasCaptcha = !captchaEnabled || captcha !== '';
+    setIsLoginDisabled(!(hasUsername && hasPassword && hasCaptcha));
+  };
+
+  const refreshCaptcha = () => {
+    // Reload page to get a new CAPTCHA question
+    window.location.reload();
   };
 
   const handleSubmit = () => {
@@ -94,6 +119,39 @@ const LoginPage = ({ alerts, caption, logoSrc, token }) => {
           {...defaultFormProps.passwordField}
         />
       </FormGroup>
+      {captchaEnabled && captchaQuestion && (
+        <FormGroup
+          isRequired
+          fieldId="captcha"
+          label={__('CAPTCHA')}
+          helperText={__('Solve the math problem')}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', padding: '8px 12px', border: '1px solid #ccc', borderRadius: '4px', backgroundColor: '#f5f5f5' }}>
+              {captchaQuestion}
+            </div>
+            <Button
+              variant="link"
+              onClick={refreshCaptcha}
+              aria-label={__('Refresh CAPTCHA')}
+            >
+              {__('Refresh')}
+            </Button>
+          </div>
+          <TextInput
+            ouiaId="login-captcha"
+            isRequired
+            type="text"
+            value={captchaAnswer}
+            onChange={handleCaptchaChange}
+            id="login_captcha_answer"
+            name="login[captcha_answer]"
+            placeholder={__('Enter your answer')}
+            autoComplete="off"
+            maxLength={10}
+          />
+        </FormGroup>
+      )}
       <input name="authenticity_token" type="hidden" value={token} />
       <ActionGroup>
         <Button
@@ -136,6 +194,8 @@ LoginPage.propTypes = {
   caption: PropTypes.string,
   logoSrc: PropTypes.string,
   token: PropTypes.string.isRequired,
+  captchaEnabled: PropTypes.bool,
+  captchaQuestion: PropTypes.string,
 };
 
 LoginPage.defaultProps = {
@@ -143,6 +203,8 @@ LoginPage.defaultProps = {
   backgroundUrl: null,
   caption: null,
   logoSrc: null,
+  captchaEnabled: false,
+  captchaQuestion: null,
 };
 
 export default LoginPage;

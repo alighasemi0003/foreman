@@ -159,5 +159,16 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("The algorithm used to encode the JWT in the OpenID provider."),
       default: nil,
       full_name: N_('OIDC Algorithm'))
+    setting('captcha_enabled',
+      type: :boolean,
+      description: N_("Enable CAPTCHA verification on login page"),
+      default: false,
+      full_name: N_('CAPTCHA enabled'))
+    setting('captcha_type',
+      type: :string,
+      description: N_("Type of CAPTCHA to use: 'image', 'audio', or 'both'"),
+      default: 'image',
+      full_name: N_('CAPTCHA type'),
+      collection: proc { { 'image' => _("Image"), 'audio' => _("Audio"), 'both' => _("Both Image and Audio") } })
   end
 end

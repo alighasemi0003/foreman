@@ -147,11 +147,26 @@ class UsersController < ApplicationController
       inline_error _("Too many tries, please try again in a few minutes.")
       log_bruteforce
       telemetry_increment_counter(:bruteforce_locked_ui_logins)
+      generate_captcha_question if Setting[:captcha_enabled]
       render :layout => 'login', :status => :unauthorized
       return
     end
 
     if request.post?
+      # Verify CAPTCHA if enabled (simple math CAPTCHA)
+      if Setting[:captcha_enabled]
+        captcha_answer = params.dig(:login, :captcha_answer)
+        unless captcha_answer.present? && captcha_answer.to_s.strip == session[:captcha_ans].to_s
+          inline_error _("Captcha answer is incorrect")
+          logger.warn("CAPTCHA verification failed from #{request.remote_ip} with username '#{params[:login].try(:[], 'login')}'")
+          generate_captcha_question
+          redirect_to login_users_path
+          return
+        end
+        session.delete(:captcha_ans)
+        session.delete(:captcha_question)
+      end
+
       backup_session_content { reset_session }
       intercept = SSO::FormIntercept.new(self)
       if intercept.available? && intercept.authenticated?
@@ -176,6 +191,8 @@ class UsersController < ApplicationController
         login_user(user)
       end
     else
+      generate_captcha_question if Setting[:captcha_enabled]
+
       if params[:status] && params[:status] == "401"
         render :layout => 'login', :status => params[:status]
       else
@@ -283,5 +300,12 @@ class UsersController < ApplicationController
     raise exception unless request.post? && action_name == 'login'
     inline_warning _("CSRF protection token expired, please log in again")
     redirect_to login_users_path
+  end
+
+  def generate_captcha_question
+    num1 = rand(1..9)
+    num2 = rand(1..9)
+    session[:captcha_ans] = num1 + num2
+    session[:captcha_question] = "What is #{num1} + #{num2}?"
   end
 end

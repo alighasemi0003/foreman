@@ -51,6 +51,8 @@ services:
       - ./extras:/home/foreman/extras
       - ./config/routes.rb:/home/foreman/config/routes.rb
       - ./config/initializers/f_foreman_permissions.rb:/home/foreman/config/initializers/f_foreman_permissions.rb
+      - ./config/initializers/f_foreman_settings_auth.rb:/home/foreman/config/initializers/f_foreman_settings_auth.rb
+      - ./webpack/assets/javascripts/react_app/components/LoginPage:/home/foreman/webpack/assets/javascripts/react_app/components/LoginPage
 
   orchestrator:
     <<: *app_base
