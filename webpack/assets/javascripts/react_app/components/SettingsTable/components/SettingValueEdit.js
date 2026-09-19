@@ -122,6 +122,8 @@ const SettingValueEdit = ({ setting, updateSetting }) => {
       onKeyDown={handleKeyDown}
       isDisabled={loading}
       className={cssClasses}
+      type={setting.encrypted ? 'password' : 'text'}
+      autoComplete={setting.encrypted ? 'off' : undefined}
     />
   );
 

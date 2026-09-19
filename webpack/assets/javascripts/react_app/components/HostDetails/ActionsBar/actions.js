@@ -98,7 +98,7 @@ export const cancelBuild = (hostId, hostName) => dispatch => {
   const errorToast = ({ message }) => message;
   const url = foremanUrl(`/hosts/${hostId}/cancelBuild`);
   dispatch(
-    APIActions.get({
+    APIActions.put({
       url,
       key: `${hostId}_CANCEL_BUILD`,
       successToast,

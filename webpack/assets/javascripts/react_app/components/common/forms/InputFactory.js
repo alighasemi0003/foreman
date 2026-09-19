@@ -73,6 +73,9 @@ const InputFactory = ({
       validated={validated}
       ouiaId={`input-factory-text-input-${id}`}
       aria-label={`text-input-${id}`}
+      {...(type === 'password' && !otherProps.autoComplete
+        ? { autoComplete: 'off' }
+        : {})}
       {...otherProps}
     />
   );

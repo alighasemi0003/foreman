@@ -8,6 +8,7 @@ import {
   removeLastSlashFromPath,
   noop,
   foremanUrl,
+  postNavigateWithCsrf,
 } from '../../common/helpers';
 import { NAV_MENU_ALL_HOST } from './LayoutConstants';
 import { getHostsPageUrl } from '../../Root/Context/ForemanContext';
@@ -67,7 +68,7 @@ const createOrgItem = orgs => {
     name: 'Any Organization',
     title: __('Any Organization'),
     onClick: () => {
-      window.location.assign(foremanUrl('/organizations/clear'));
+      postNavigateWithCsrf(foremanUrl('/organizations/clear'));
     },
   };
   const childrenArray = [anyOrg];
@@ -78,7 +79,7 @@ const createOrgItem = orgs => {
       name: org.title,
       title: org.title,
       onClick: () => {
-        window.location.assign(org.href);
+        postNavigateWithCsrf(org.href);
       },
     };
     childrenArray.push(childObject);
@@ -100,7 +101,7 @@ const createLocationItem = locations => {
     name: 'Any Location',
     title: __('Any Location'),
     onClick: () => {
-      window.location.assign(foremanUrl('/locations/clear'));
+      postNavigateWithCsrf(foremanUrl('/locations/clear'));
     },
   };
   const childrenArray = [anyLoc];
@@ -111,7 +112,7 @@ const createLocationItem = locations => {
       name: loc.title,
       title: loc.title,
       onClick: () => {
-        window.location.assign(loc.href);
+        postNavigateWithCsrf(loc.href);
       },
     };
     childrenArray.push(childObject);

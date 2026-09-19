@@ -7,7 +7,7 @@ import {
   ContextSelectorFooter,
 } from '@patternfly/react-core/deprecated';
 import { CheckIcon, GlobeIcon, BuildingIcon } from '@patternfly/react-icons';
-import { foremanUrl } from '../../../../common/helpers';
+import { foremanUrl, postNavigateWithCsrf } from '../../../../common/helpers';
 import { translate as __ } from '../../../../common/I18n';
 import './TaxonomyDropdown.scss';
 
@@ -63,7 +63,7 @@ const TaxonomyDropdown = ({ taxonomyType, currentTaxonomy, taxonomies }) => {
       key={0}
       className={`${taxonomyType}s_clear`}
       onClick={() => {
-        window.location.assign(anyTaxonomyURL);
+        postNavigateWithCsrf(anyTaxonomyURL);
       }}
       isDisabled={!currentTaxonomy}
     >
@@ -122,7 +122,7 @@ const TaxonomyDropdown = ({ taxonomyType, currentTaxonomy, taxonomies }) => {
           className={`${taxonomyType}_menuitem`}
           onClick={() => {
             if (href) {
-              window.location.assign(href);
+              postNavigateWithCsrf(href);
             }
           }}
           isDisabled={title === currentTaxonomy}

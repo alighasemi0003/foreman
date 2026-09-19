@@ -52,6 +52,23 @@ describe('PasswordStrength component', () => {
       input.simulate('change', { target: { value } });
     };
 
+    it('sets autocomplete off on password and confirmation', () => {
+      const props = createProps({
+        data: { ...passwordStrengthDataWithVerify },
+      });
+      const component = mount(<PasswordStrength {...props} />);
+
+      expect(
+        component.find(`input#${props.data.id}`).getDOMNode().getAttribute('autocomplete')
+      ).toEqual('off');
+      expect(
+        component
+          .find('input#password_confirmation')
+          .getDOMNode()
+          .getAttribute('autocomplete')
+      ).toEqual('off');
+    });
+
     it('should trigger updatePassword', () => {
       const props = createProps();
       const component = mount(<PasswordStrength {...props} />);

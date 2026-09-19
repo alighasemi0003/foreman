@@ -51,7 +51,7 @@ exports[`LoginPage rendering renders LoginPage 1`] = `
         isRequired={true}
       >
         <TextInput
-          autoComplete="current-password"
+          autoComplete="off"
           id="login_password"
           isRequired={true}
           name="login[password]"

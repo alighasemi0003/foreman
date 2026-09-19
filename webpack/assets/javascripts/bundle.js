@@ -30,6 +30,9 @@ import * as lookupKeys from './foreman_lookup_keys';
 import './react_app/common/MountingService';
 import './foreman_overrides';
 import './bundle_novnc';
+import { installLegacyReauthentication } from './react_app/common/LegacyReauthentication';
+
+installLegacyReauthentication();
 
 // Set the public path for dynamic imports
 if (process.env.NODE_ENV !== 'production') {

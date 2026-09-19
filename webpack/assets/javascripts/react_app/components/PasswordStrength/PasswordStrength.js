@@ -29,7 +29,7 @@ const PasswordStrength = ({
       >
         <ReactPasswordStrength
           changeCallback={({ password }) => updatePassword(password)}
-          minLength={6}
+          minLength={8}
           minScore={2}
           userInputs={userInputs}
           tooShortWord={__('Too short')}
@@ -40,7 +40,7 @@ const PasswordStrength = ({
             __('Strong'),
             __('Very strong'),
           ]}
-          inputProps={{ name, id, className, autoComplete: 'new-password' }}
+          inputProps={{ name, id, className, autoComplete: 'off' }}
         />
       </CommonForm>
       {verify && (
@@ -56,6 +56,7 @@ const PasswordStrength = ({
             id="password_confirmation"
             name={verify.name}
             type="password"
+            autoComplete="off"
             onChange={({ target }) => updatePasswordConfirmation(target.value)}
             className="form-control"
           />

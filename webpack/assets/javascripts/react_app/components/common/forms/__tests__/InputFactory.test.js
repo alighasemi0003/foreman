@@ -128,6 +128,21 @@ describe('InputFactory', () => {
       render(<InputFactory type="password" name="test" id="test-password" value="" />);
       const input = document.querySelector('input[type="password"]');
       expect(input).toBeInTheDocument();
+      expect(input).toHaveAttribute('autocomplete', 'off');
+    });
+
+    it('should allow password autocomplete override when explicitly set', () => {
+      render(
+        <InputFactory
+          type="password"
+          name="test"
+          id="test-password-override"
+          value=""
+          autoComplete="off"
+        />
+      );
+      const input = document.querySelector('#test-password-override');
+      expect(input).toHaveAttribute('autocomplete', 'off');
     });
 
     it('should render number input', () => {

@@ -114,7 +114,7 @@ const LoginPage = ({
           isRequired
           type="password"
           value={password}
-          autoComplete="current-password"
+          autoComplete="off"
           onChange={handlePasswordChange}
           {...defaultFormProps.passwordField}
         />

@@ -74,6 +74,33 @@ export const newWindowOnClick = url => event => {
 };
 
 /**
+ * Navigate via CSRF-protected POST (browser follows redirect).
+ * Used for session-mutating actions that must not be reachable via GET.
+ * @param {String} url - target URL that accepts POST + authenticity_token
+ */
+export const postNavigateWithCsrf = url => {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = url;
+  form.style.display = 'none';
+
+  const csrfParam =
+    document.querySelector('meta[name="csrf-param"]')?.content ||
+    'authenticity_token';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+  if (csrfToken) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = csrfParam;
+    input.value = csrfToken;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+};
+
+/**
  * Clear the spaces in both sides of a string and erase multiple spaces.
  * @param {String} string - the string which should be trimmed.
  */
