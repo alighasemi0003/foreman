@@ -33,7 +33,7 @@ RUN \
   dnf install -y redhat-rpm-config git-core \
     gcc-c++ make bzip2 gettext tar \
     libxml2-devel libffi-devel libcurl-devel ruby-devel \
-    postgresql-devel && \
+    postgresql-devel libcap-devel && \
   dnf clean all
 
 ENV DATABASE_URL=nulldb://nohost
@@ -57,7 +57,8 @@ RUN \
   mv -v db/schema.rb.nulldb db/schema.rb && \
   bundle exec rake assets:clean assets:precompile
 
-RUN npm install --no-audit --no-optional && \
+RUN chmod +x script/npm_install_plugins.js script/plugin_webpack_directories.rb && \
+  npm install --no-audit --no-optional && \
   ./node_modules/webpack/bin/webpack.js --config config/webpack.config.js && \
 # cleanups
   rm -rf public/webpack/stats.json ./node_modules vendor/ruby/*/cache vendor/ruby/*/gems/*/node_modules bundler.d/nulldb.rb db/schema.rb && \
@@ -86,6 +87,7 @@ COPY --from=builder --chown=1001:0 ${HOME}/Gemfile.lock ${HOME}/Gemfile.lock
 COPY --from=builder --chown=1001:0 ${HOME}/vendor/ruby ${HOME}/vendor/ruby
 COPY --from=builder --chown=1001:0 ${HOME}/public ${HOME}/public
 RUN rm -rf bundler.d/nulldb.rb bin/spring
+RUN chmod +x bin/* script/npm_install_plugins.js script/plugin_webpack_directories.rb || true
 
 RUN date -u > BUILD_TIME
 

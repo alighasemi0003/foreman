@@ -19,13 +19,19 @@ services:
       - db:/var/lib/postgresql/data
 
   app: &app_base
-    image: quay.io/foreman/foreman:develop
-    command: bundle exec bin/rails server -b 0.0.0.0
+    image: foreman-local:reauth
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash -lc 'rm -f tmp/pids/server.pid && chmod +x bin/* 2>/dev/null; exec bundle exec rails server -b 0.0.0.0'
     working_dir: /home/foreman
     environment:
       - DATABASE_URL=postgres://foreman:foreman@db/foreman?pool=5
       - RAILS_MAX_THREADS=5
       - RAILS_ENV=production
+      # Local compose serves HTTP on :3000 — do not enforce force_ssl here.
+      # Real Production must omit this (defaults to HTTPS) or set FOREMAN_REQUIRE_SSL=true.
+      - FOREMAN_REQUIRE_SSL=false
       - BUNDLE_WITHOUT=test:development:openid:libvirt:journald:facter:console:assets
       - FOREMAN_FQDN=foreman.example.com
       - FOREMAN_DOMAIN=example.com
@@ -50,9 +56,17 @@ services:
       - ./lib:/home/foreman/lib
       - ./extras:/home/foreman/extras
       - ./config/routes.rb:/home/foreman/config/routes.rb
+      - ./config/application.rb:/home/foreman/config/application.rb
+      - ./config/settings.rb:/home/foreman/config/settings.rb
+      - ./config/environments/production.rb:/home/foreman/config/environments/production.rb
       - ./config/initializers/f_foreman_permissions.rb:/home/foreman/config/initializers/f_foreman_permissions.rb
       - ./config/initializers/f_foreman_settings_auth.rb:/home/foreman/config/initializers/f_foreman_settings_auth.rb
+      - ./config/initializers/secure_headers.rb:/home/foreman/config/initializers/secure_headers.rb
+      # Host-built webpack bundle (includes Reauthentication modal/retry)
+      - ./public/webpack:/home/foreman/public/webpack
       - ./webpack/assets/javascripts/react_app/components/LoginPage:/home/foreman/webpack/assets/javascripts/react_app/components/LoginPage
+      - ./webpack/assets/javascripts/react_app/common/Reauthentication.js:/home/foreman/webpack/assets/javascripts/react_app/common/Reauthentication.js
+      - ./webpack/assets/javascripts/react_app/redux/API/APIRequest.js:/home/foreman/webpack/assets/javascripts/react_app/redux/API/APIRequest.js
 
   orchestrator:
     <<: *app_base
