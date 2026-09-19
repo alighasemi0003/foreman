@@ -33,6 +33,8 @@ module Api
       param_group :filter, :as => :create
 
       def create
+        return unless ensure_reauthenticated!('users.change_roles')
+
         @filter = nested_obj.respond_to?(:filters) ? nested_obj.filters.build(filter_params) : Filter.new(filter_params)
         process_response @filter.save
       end
@@ -42,6 +44,8 @@ module Api
       param_group :filter
 
       def update
+        return unless ensure_reauthenticated!('users.change_roles')
+
         process_response @filter.update(filter_params)
       end
 
@@ -49,6 +53,8 @@ module Api
       param :id, String, :required => true
 
       def destroy
+        return unless ensure_reauthenticated!('users.change_roles')
+
         process_response @filter.destroy
       end
 

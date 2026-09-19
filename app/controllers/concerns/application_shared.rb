@@ -4,6 +4,7 @@ module ApplicationShared
   include Foreman::Controller::MigrationChecker
   include Foreman::Controller::Authentication
   include Foreman::Controller::Session
+  include Foreman::Controller::Reauthentication
   include Foreman::Controller::TopbarSweeper
   include Foreman::Controller::Timezone
   include Foreman::ThreadSession::Cleaner
@@ -146,10 +147,20 @@ module ApplicationShared
   end
 
   def virtual_column_scope(base_scope)
-    virt_column = params[:order]&.split(' ')&.first
+    order_parts = params[:order].to_s.split
+    virt_column = order_parts.first
+    return if virt_column.blank?
+    return unless virt_column.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
+
     select_method = "select_#{virt_column}"
     model = respond_to?(:model_of_controller) ? model_of_controller : resource_class
-    return if virt_column.blank? || model.columns_hash[virt_column] || !base_scope.virtual_column_scopes.include?(select_method.to_sym)
-    base_scope.public_send(select_method).search_for(params[:search]).reorder(params[:order])
+    return if model.columns_hash[virt_column] || !base_scope.virtual_column_scopes.include?(select_method.to_sym)
+
+    direction = order_parts.second&.upcase
+    direction = 'ASC' unless %w[ASC DESC].include?(direction)
+
+    # Allowlist column + direction only — never pass raw params[:order] to reorder.
+    # Extra tokens (e.g. SQL functions) are ignored.
+    base_scope.public_send(select_method).search_for(params[:search]).reorder("#{virt_column} #{direction}")
   end
 end

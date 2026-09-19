@@ -6,7 +6,8 @@ module BMCHelper
     when 'off'
       "<span class='label label-default'>#{_('Off')}</span>".html_safe
     else
-      "<span class='label label-default'>#{_('Unknown status: %s') % s.inspect}</span>".html_safe
+      status = ERB::Util.html_escape(s.to_s)
+      "<span class='label label-default'>#{_('Unknown status: %s') % status}</span>".html_safe
     end
   end
 

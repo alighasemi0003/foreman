@@ -1,4 +1,4 @@
-<%= form_for @auth_source_ldap do |f| %>
+<%= form_for @auth_source_ldap, :html => { :data => { :foreman_reauth => true } } do |f| %>
   <%= base_errors_for @auth_source_ldap %>
   <ul class="nav nav-tabs" data-tabs="tabs">
     <li class="active"><a href="#primary" data-toggle="tab"><%= _("LDAP server") %></a></li>

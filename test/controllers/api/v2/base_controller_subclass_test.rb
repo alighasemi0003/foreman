@@ -111,7 +111,7 @@ class Api::V2::TestableControllerTest < ActionController::TestCase
     end
 
     context 'disabled user cannot be authenticated' do
-      let(:user) { as_admin { FactoryBot.create(:user, :admin, disabled: true, password: 'password') } }
+      let(:user) { as_admin { FactoryBot.create(:user, :admin, disabled: true, password: 'Password1!') } }
 
       test '#login authenticates user with basic auth' do
         request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials(user.login, 'password')

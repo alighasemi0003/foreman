@@ -23,7 +23,9 @@ module FormHelper
     value = f.object[attr] if options.delete(:keep_value)
     password_field_tag(:fakepassword, value, :style => 'display: none', :autocomplete => 'new-password-fake') +
         field(f, attr, options) do
-          options[:autocomplete]   ||= 'new-password'
+          # Organizational checklist requires explicit autocomplete="off"
+          # on all sensitive credential / secret fields.
+          options[:autocomplete]   ||= 'off'
           options[:placeholder]    ||= password_placeholder(f.object, attr)
           options[:disabled] = true if unset_button
           options[:value] = value if value.present?

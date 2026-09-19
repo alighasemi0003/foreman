@@ -63,7 +63,9 @@ module TemplatesHelper
     input_value = f.object
     input = input_value.template_input
 
-    options.reverse_merge!(label: input.name, id: input.name, label_help: input.description.presence, required: input.required)
+    # Escape description: popover uses html:true and must not render stored XSS.
+    description = input.description.presence && ERB::Util.html_escape(input.description)
+    options.reverse_merge!(label: input.name, id: input.name, label_help: description, required: input.required)
 
     if input.value_type == 'resource'
       return selectable_f(f, :value, resource_value_options(input.resource_type), { include_blank: !input.required }, options)

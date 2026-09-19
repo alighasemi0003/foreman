@@ -7,6 +7,8 @@ class AuthSourceExternalsController < ApplicationController
   end
 
   def update
+    return unless ensure_reauthenticated!('auth_sources.update')
+
     if @auth_source_external.update(auth_source_external_params)
       process_success :success_redirect => auth_sources_path
     else

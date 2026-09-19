@@ -36,6 +36,8 @@ module Api
       param_group :auth_source_external
 
       def update
+        return unless ensure_reauthenticated!('auth_sources.update')
+
         process_response @auth_source_external.update(auth_source_external_params)
       end
 

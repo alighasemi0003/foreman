@@ -25,10 +25,23 @@ module Mutations
       user = User.try_to_login(username, password)
 
       unless user
-        Rails.logger.warn("Failed login attempt from #{context['request_ip']} with username '#{username}'.")
+        Foreman::SecurityEvent.log(
+          event: 'LOGIN_FAILED',
+          status: 'FAILURE',
+          level: :warn,
+          actor: username,
+          ip: context[:request_ip]
+        )
         bruteforce_protection.count_login_failure
         return
       end
+
+      Foreman::SecurityEvent.log(
+        event: 'LOGIN_SUCCESS',
+        status: 'SUCCESS',
+        actor: user.login,
+        ip: context[:request_ip]
+      )
 
       {
         token: user.jwt_token!,

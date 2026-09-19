@@ -106,4 +106,25 @@ class FormHelperTest < ActionView::TestCase
         multiple_checkboxes(f, :organizations, f.object, user.organizations))
     end
   end
+
+  context '#password_f' do
+    setup do
+      stubs(:password_placeholder).returns('')
+    end
+
+    test 'defaults autocomplete to off for sensitive fields' do
+      form_for User.new do |f|
+        html = password_f(f, :password)
+        assert_includes html, 'type="password"'
+        assert_match(/autocomplete="off"/, html)
+      end
+    end
+
+    test 'renders explicit autocomplete off when set' do
+      form_for User.new do |f|
+        html = password_f(f, :password, :autocomplete => 'off')
+        assert_match(/autocomplete="off"/, html)
+      end
+    end
+  end
 end

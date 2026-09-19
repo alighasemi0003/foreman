@@ -58,6 +58,8 @@ module Api
 
       def create
         @auth_source_ldap = AuthSourceLdap.new(auth_source_ldap_params)
+        return unless ensure_reauthenticated!('auth_sources.create')
+
         process_response @auth_source_ldap.save
       end
 
@@ -66,6 +68,8 @@ module Api
       param_group :auth_source_ldap
 
       def update
+        return unless ensure_reauthenticated!('auth_sources.update')
+
         process_response @auth_source_ldap.update(auth_source_ldap_params)
       end
 
@@ -86,6 +90,8 @@ module Api
       param :id, String, :required => true
 
       def destroy
+        return unless ensure_reauthenticated!('auth_sources.destroy')
+
         process_response @auth_source_ldap.destroy
       end
 

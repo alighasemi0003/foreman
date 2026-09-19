@@ -1,7 +1,8 @@
 require 'digest/sha1'
 
 class User < ApplicationRecord
-  audited :except => [:last_login_on, :password_hash, :password_salt, :password_confirmation],
+  audited :except => [:last_login_on, :password_hash, :password_salt, :password_confirmation,
+                      :failed_login_attempts, :failed_login_started_at, :locked_until],
     :associations => [:roles, :usergroups]
   include Authorizable
   include Foreman::TelemetryHelper
@@ -15,6 +16,8 @@ class User < ApplicationRecord
   include Exportable
   include TopbarCacheExpiry
   include JwtAuth
+  include UserAccountLockout
+  include UserPasswordComplexity
   include Foreman::ObservableModel
 
   ANONYMOUS_ADMIN = 'foreman_admin'
@@ -115,11 +118,15 @@ class User < ApplicationRecord
   before_validation :prepare_password, :normalize_mail
   before_save       :set_lower_login
   before_save       :normalize_timezone
+  # Clear before validations so switching an internal user to LDAP/external is allowed
+  # while still rejecting password_change_required=true on an already-external user.
+  before_validation :reset_password_change_required_for_external_users, :if => :will_save_change_to_auth_source_id?
   before_save       :reset_password_change_required_for_external_users
   before_save :invalidate_cache
 
   after_create :welcome_mail
   after_create :set_default_widgets
+  after_save :reset_lockout_after_password_change
 
   scoped_search :on => :id, :complete_enabled => false, :only_explicit => true, :validator => ScopedSearch::Validators::INTEGER
   scoped_search :on => :login, :complete_value => :true
@@ -268,46 +275,73 @@ class User < ApplicationRecord
     # Make sure no one can sign in with an empty password
     return nil if password.to_s.empty?
 
+    authenticated_via_pat = false
+
     # user is already in local database
     if (user = unscoped.find_by_login(login))
-      # user has an authentication method and the authentication was successful
+      # Personal Access Tokens are a separate credential from local passwords.
+      # Account lockout applies only to local password authentication, not PAT.
       if api_request && user.authenticate_by_personal_access_token(password)
         logger.debug("Authenticated user #{user.login} with a Personal Access Token.")
+        authenticated_via_pat = true
 
         unless user.auth_source.valid_user?(user.login)
           logger.debug "Failed to find #{user.login} in #{user.auth_source} authentication source"
           user = nil
-        end
-      elsif user.auth_source && (attrs = user.auth_source.authenticate(login, password))
-        logger.debug "Authenticated user #{user.login} against #{user.auth_source} authentication source"
-
-        # update with returned attrs, maybe some info changed in LDAP
-        old_hash = user.avatar_hash
-        User.as_anonymous_admin do
-          if attrs.is_a? Hash
-            valid_attrs = attrs.slice(:firstname, :lastname, :mail, :avatar_hash).delete_if { |k, v| v.blank? }
-            logger.debug("Updating user #{user.login} attributes from auth source: #{attrs.keys}")
-            unless user.update(valid_attrs)
-              logger.warn "Failed to update #{user.login} attributes: #{user.errors.full_messages.join(', ')}"
-            end
-          end
-          user.auth_source.update_usergroups(user.login)
-        end
-
-        # clean up old avatar if it exists and the image isn't in use by anyone else
-        if old_hash.present? && user.avatar_hash != old_hash && !User.unscoped.where(:avatar_hash => old_hash).any?
-          old_avatar = "#{Rails.public_path}/images/avatars/#{old_hash}.jpg"
-          File.delete(old_avatar) if File.exist?(old_avatar)
+          authenticated_via_pat = false
         end
       else
-        logger.debug "Failed to authenticate #{user.login} against #{user.auth_source} authentication source"
-        user = nil
+        # Account-level lockout applies only to local password authentication.
+        if user.internal?
+          user.clear_expired_account_lock!
+          if user.account_locked?
+            logger.info("Login denied for locked local user #{user.login} (id=#{user.id})")
+            Foreman::SecurityEvent.log(
+              event: 'LOGIN_DENIED_LOCKED',
+              status: 'LOCKED',
+              level: :warn,
+              actor: user.login,
+              ip: Foreman::SecurityEvent.current_ip,
+              details: "id=#{user.id}"
+            )
+            User.current = nil
+            return nil
+          end
+        end
+
+        if user.auth_source && (attrs = user.auth_source.authenticate(login, password))
+          logger.debug "Authenticated user #{user.login} against #{user.auth_source} authentication source"
+
+          # update with returned attrs, maybe some info changed in LDAP
+          old_hash = user.avatar_hash
+          User.as_anonymous_admin do
+            if attrs.is_a? Hash
+              valid_attrs = attrs.slice(:firstname, :lastname, :mail, :avatar_hash).delete_if { |k, v| v.blank? }
+              logger.debug("Updating user #{user.login} attributes from auth source: #{attrs.keys}")
+              unless user.update(valid_attrs)
+                logger.warn "Failed to update #{user.login} attributes: #{user.errors.full_messages.join(', ')}"
+              end
+            end
+            user.auth_source.update_usergroups(user.login)
+          end
+
+          # clean up old avatar if it exists and the image isn't in use by anyone else
+          if old_hash.present? && user.avatar_hash != old_hash && !User.unscoped.where(:avatar_hash => old_hash).any?
+            old_avatar = "#{Rails.public_path}/images/avatars/#{old_hash}.jpg"
+            File.delete(old_avatar) if File.exist?(old_avatar)
+          end
+        else
+          logger.debug "Failed to authenticate #{user.login} against #{user.auth_source} authentication source"
+          user.register_failed_login! if user.internal?
+          user = nil
+        end
       end
     else
       user = try_to_auto_create_user(login, password)
     end
     if user
-      user.post_successful_login
+      # PAT success must not clear password-lockout state; only password logins reset it.
+      user.post_successful_login(reset_account_lockout: !authenticated_via_pat)
     else
       logger.info "invalid user"
       User.current = nil
@@ -315,12 +349,24 @@ class User < ApplicationRecord
     user
   end
 
-  def post_successful_login
+  def post_successful_login(reset_account_lockout: true)
     logger.debug "Post-login processing for #{login}"
     User.as_anonymous_admin do
       update_columns(:last_login_on => Time.now.utc)
       ensure_default_role
       claim_active_session
+      if reset_account_lockout && internal? && has_attribute?(:failed_login_attempts) &&
+          (failed_login_attempts.to_i > 0 || locked_until.present? || failed_login_started_at.present?)
+        logger.info("Resetting account lockout state after successful login for user #{login} (id=#{id})")
+        Foreman::SecurityEvent.log(
+          event: 'ACCOUNT_LOCKOUT_RESET',
+          status: 'SUCCESS',
+          actor: login,
+          ip: Foreman::SecurityEvent.current_ip,
+          details: "id=#{id}"
+        )
+        reset_failed_login_state!
+      end
     end
     User.current = self
   end
@@ -576,8 +622,15 @@ class User < ApplicationRecord
   end
 
   def self.random_password(size = 16)
-    set = ('a'..'z').to_a + ('A'..'Z').to_a + ('0'..'9').to_a - %w(0 1 O I l)
-    Array.new(size) { set.sample }.join
+    size = [size, UserPasswordComplexity::MINIMUM_LENGTH].max
+    letters = (('a'..'z').to_a + ('A'..'Z').to_a) - %w(O I l)
+    digits = ('2'..'9').to_a
+    specials = %w(! @ # $ % & * - _)
+    pool = letters + digits + specials
+    # Guarantee letter, digit, and special character for local password policy.
+    chars = [letters.sample, digits.sample, specials.sample]
+    chars.concat(Array.new(size - chars.length) { pool.sample })
+    chars.shuffle.join
   end
 
   def expire_topbar_cache
@@ -656,6 +709,16 @@ class User < ApplicationRecord
       self.password_hash = hash_password(password)
       self.password_change_required = false if internal? && User.current == self
     end
+  end
+
+  def reset_lockout_after_password_change
+    return unless internal?
+    return unless has_attribute?(:failed_login_attempts)
+    return unless saved_change_to_password_hash?
+    return if failed_login_attempts.to_i.zero? && failed_login_started_at.nil? && locked_until.nil?
+
+    logger.info("Resetting account lockout state after password change for user #{login} (id=#{id})")
+    reset_failed_login_state!
   end
 
   def welcome_mail

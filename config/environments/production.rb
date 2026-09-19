@@ -39,7 +39,9 @@ Foreman::Application.configure do |app|
   config.colorize_logging = Foreman::Logging.config[:colorize]
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  # config.force_ssl = true
+  # Controlled by SETTINGS[:require_ssl] in config/application.rb (Production defaults to true).
+  # Opt-out: FOREMAN_REQUIRE_SSL=false
+  # config.force_ssl is set from SETTINGS[:require_ssl]; do not set a conflicting value here.
 
   # Prepend all log lines with the following tags.
   # config.log_tags = [ :subdomain, :uuid ]

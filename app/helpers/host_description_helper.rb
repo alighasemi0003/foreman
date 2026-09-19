@@ -96,6 +96,7 @@ module HostDescriptionHelper
           if host.build
             link_to_if_authorized(_("Cancel build"), hash_for_cancelBuild_host_path(:id => host).merge(:auth_object => host, :permission => 'build_hosts'),
               :disabled => host.can_be_built?,
+              :method   => :put,
               :title    => _("Cancel build request for this host"), :id => "cancel-build-button", :class => 'btn btn-default')
           else
             link_to_if_authorized(_("Build"), hash_for_host_path(:id => host).merge(:auth_object => host, :permission => 'build_hosts', :anchor => "review_before_build"),

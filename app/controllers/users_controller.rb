@@ -8,7 +8,8 @@ class UsersController < ApplicationController
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
   skip_before_action :require_login, :check_user_enabled, :check_active_session, :require_password_change, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
-  skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation]
+  skip_before_action :check_active_session, :only => :extlogin
+  skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation, :reauthenticate]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
   before_action      :verify_active_session, :only => :login
@@ -22,6 +23,8 @@ class UsersController < ApplicationController
   end
 
   def create
+    return unless ensure_reauthenticated!('users.create')
+
     @user = User.new(user_params)
     if @user.save
       process_success
@@ -41,8 +44,10 @@ class UsersController < ApplicationController
   def update
     editing_self?
     @user = find_resource(:edit_users)
+    return unless ensure_user_update_reauthenticated!(@user, user_params)
     if @user.update(user_params)
       update_sub_hostgroups_owners
+      clear_reauth_after_password_change_if_needed!
 
       process_success((editing_self? && !current_user.allowed_to?({:controller => 'users', :action => 'index'})) ? { :success_redirect => helpers.current_hosts_path } : { :success_redirect => users_path })
     else
@@ -65,6 +70,8 @@ class UsersController < ApplicationController
       return
     end
 
+    return unless ensure_reauthenticated!('users.destroy')
+
     if @user.destroy
       process_success
     else
@@ -73,6 +80,8 @@ class UsersController < ApplicationController
   end
 
   def impersonate
+    return unless ensure_reauthenticated!('users.impersonate')
+
     user = User.enabled.find_by_id(params[:id])
     if user.nil?
       warning _("User is disabled")
@@ -80,13 +89,20 @@ class UsersController < ApplicationController
       return
     end
     if session[:impersonated_by].blank?
-      session[:impersonated_by] = User.current.id
-      User.impersonator = User.current
+      real_admin = User.current
+      session[:impersonated_by] = real_admin.id
+      User.impersonator = real_admin
       user.claim_active_session
       session[:user] = user.id
       success _("You impersonated user %s, to cancel the session, click the impersonation icon in the top bar.") % user.name
-      Audit.create :auditable_type => 'User', :auditable_id => user.id, :user_id => User.current.id, :action => 'impersonate', :audited_changes => {}
-      logger.info "User #{User.current.name} impersonated #{user.name}"
+      Audit.create :auditable_type => 'User', :auditable_id => user.id, :user_id => real_admin.id, :action => 'impersonate', :audited_changes => {}
+      Foreman::SecurityEvent.log(
+        event: 'IMPERSONATION_START',
+        status: 'SUCCESS',
+        actor: real_admin.login,
+        ip: request.remote_ip,
+        target: user.login
+      )
       redirect_to helpers.current_hosts_path
     else
       info _("You are already impersonating, click the impersonation icon in the top bar before starting a new impersonation.")
@@ -95,6 +111,8 @@ class UsersController < ApplicationController
   end
 
   def terminate_active_sessions_for_all_users
+    return unless ensure_reauthenticated!('users.terminate_sessions')
+
     user_ids = User.authorized(:edit_users).where(:has_active_session => true).where.not(:id => User.current.id).ids
     User.terminate_active_sessions_for(user_ids)
     process_success(:success_msg => _('Successfully terminated active sessions for all users.'))
@@ -102,6 +120,8 @@ class UsersController < ApplicationController
 
   def invalidate_jwt
     @user = find_resource(:edit_users)
+    return unless ensure_reauthenticated!('users.invalidate_jwt')
+
     @user.jwt_secret&.destroy
     respond_to do |format|
       format.html do
@@ -122,19 +142,116 @@ class UsersController < ApplicationController
       return
     end
 
+    return unless ensure_reauthenticated!('users.terminate_sessions')
+
     @user.terminate_active_sessions!
     process_success(:success_msg => _('Successfully terminated active session for %s.') % @user.login)
   end
 
   def stop_impersonation
     if session[:impersonated_by].present?
-      user = User.unscoped.find_by_id(session[:impersonated_by])
-      session[:user] = user.id
+      real_user = User.unscoped.find_by_id(session[:impersonated_by])
+      unless real_user
+        session[:impersonated_by] = nil
+        User.impersonator = nil
+        render :json => { :message => _("No active impersonate session."), :type => :warning }
+        return
+      end
+
+      impersonated_login = User.current&.login
+      session[:user] = real_user.id
       session[:impersonated_by] = nil
       User.impersonator = nil
-      render :json => { :message => _("You now act as %s again.") % user.name, :type => :success }
+      Audit.create :auditable_type => 'User', :auditable_id => real_user.id, :user_id => real_user.id,
+                   :action => 'stop_impersonation', :audited_changes => {}
+      Foreman::SecurityEvent.log(
+        event: 'IMPERSONATION_STOP',
+        status: 'SUCCESS',
+        actor: real_user.login,
+        ip: request.remote_ip,
+        target: impersonated_login
+      )
+      Foreman::Reauthentication.clear!(session)
+      render :json => { :message => _("You now act as %s again.") % real_user.name, :type => :success }
     else
       render :json => { :message => _("No active impersonate session."), :type => :warning }
+    end
+  end
+
+  # Confirm identity for step-up authentication (interactive session only).
+  def reauthenticate
+    unless Foreman::Reauthentication.interactive_session?(session)
+      render json: {
+        error: {
+          message: _('Re-authentication is only available for interactive sessions.'),
+          status: 'reauthentication_unsupported',
+        },
+      }, status: :forbidden
+      return
+    end
+
+    actor = Foreman::Reauthentication.real_actor(session)
+    # Browser modal sends top-level JSON { password }; wrap_parameters may also nest under :user.
+    password = params[:password].presence ||
+               params.dig(:reauthentication, :password).presence ||
+               params.dig(:user, :password).presence
+    result = Foreman::Reauthentication::Verifier.new(
+      actor: actor,
+      password: password,
+      request_ip: request.remote_ip
+    ).call
+
+    case result.status
+    when :success
+      Foreman::Reauthentication.mark_authenticated!(session, actor)
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_SUCCESS',
+        status: 'SUCCESS',
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'success', message: result.message }, status: :ok
+    when :reauthentication_unsupported
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_UNSUPPORTED',
+        status: 'DENIED',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'reauthentication_unsupported', message: result.message }, status: :unprocessable_entity
+    when :account_locked
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_FAILED',
+        status: 'LOCKED',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'account_locked', message: result.message }, status: :forbidden
+    when :rate_limited
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_FAILED',
+        status: 'DENIED',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: 'rate_limited'
+      )
+      render json: { status: 'rate_limited', message: result.message }, status: :too_many_requests
+    else
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_FAILED',
+        status: 'FAILURE',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'authentication_failed', message: result.message }, status: :unauthorized
     end
   end
 
@@ -158,7 +275,13 @@ class UsersController < ApplicationController
         captcha_answer = params.dig(:login, :captcha_answer)
         unless captcha_answer.present? && captcha_answer.to_s.strip == session[:captcha_ans].to_s
           inline_error _("Captcha answer is incorrect")
-          logger.warn("CAPTCHA verification failed from #{request.remote_ip} with username '#{params[:login].try(:[], 'login')}'")
+          Foreman::SecurityEvent.log(
+            event: 'CAPTCHA_FAILED',
+            status: 'FAILURE',
+            level: :warn,
+            actor: params[:login].try(:[], 'login'),
+            ip: request.remote_ip
+          )
           generate_captcha_question
           redirect_to login_users_path
           return
@@ -177,12 +300,25 @@ class UsersController < ApplicationController
       if user.nil?
         # failed to authenticate, and/or to generate the account on the fly
         inline_error _("Incorrect username or password")
-        logger.warn("Failed login attempt from #{request.remote_ip} with username '#{params[:login].try(:[], 'login')}'")
+        Foreman::SecurityEvent.log(
+          event: 'LOGIN_FAILED',
+          status: 'FAILURE',
+          level: :warn,
+          actor: params[:login].try(:[], 'login'),
+          ip: request.remote_ip
+        )
         count_login_failure
         telemetry_increment_counter(:failed_ui_logins)
         redirect_to login_users_path
       elsif user.disabled?
         inline_error _("User account is disabled, please contact your administrator")
+        Foreman::SecurityEvent.log(
+          event: 'LOGIN_DISABLED',
+          status: 'DENIED',
+          level: :warn,
+          actor: user.login,
+          ip: request.remote_ip
+        )
         redirect_to login_users_path
       else
         # valid user
@@ -222,8 +358,14 @@ class UsersController < ApplicationController
     TopbarSweeper.expire_cache
     sso_logout_path = get_sso_method.try(:logout_url)
     user = User.unscoped.find_by_id(session[:user])
-    logger.info("User '#{user.try(:login) || session[:user]}' logged out")
+    Foreman::SecurityEvent.log(
+      event: 'LOGOUT_SUCCESS',
+      status: 'SUCCESS',
+      actor: user.try(:login) || session[:user],
+      ip: request.remote_ip
+    )
     user&.release_active_session
+    Foreman::Reauthentication.clear!(session)
     session[:user] = @user = User.current = nil
     if flash[:success] || flash[:info] || flash[:error]
       flash.keep
@@ -261,10 +403,20 @@ class UsersController < ApplicationController
   end
 
   def login_user(user)
-    logger.info("User '#{user.login}' logged in from '#{request.ip}'")
+    Foreman::SecurityEvent.log(
+      event: 'LOGIN_SUCCESS',
+      status: 'SUCCESS',
+      actor: user.login,
+      ip: request.remote_ip
+    )
     User.current = user
     user.claim_active_session
     session[:user]         = user.id
+    if Foreman::Reauthentication.marks_login_as_fresh?(user)
+      Foreman::Reauthentication.mark_authenticated!(session, user)
+    else
+      Foreman::Reauthentication.clear!(session)
+    end
     uri                    = session.to_hash.with_indifferent_access[:original_uri]
     session[:original_uri] = nil
     store_default_taxonomy(user, 'organization') unless session.has_key?(:organization_id)
@@ -277,6 +429,13 @@ class UsersController < ApplicationController
     else
       redirect_to (uri || helpers.current_hosts_path)
     end
+  end
+
+  def clear_reauth_after_password_change_if_needed!
+    return unless editing_self?
+    return if user_params[:password].blank?
+
+    Foreman::Reauthentication.clear!(session)
   end
 
   def parameter_filter_context

@@ -12,7 +12,12 @@ module Foreman::Controller::Authentication
     user = sso_authentication
 
     if user.is_a?(User)
-      logger.info("Authorized user #{user.login}(#{user.to_label})")
+      Foreman::SecurityEvent.log(
+        event: api_request? ? 'API_AUTH_SUCCESS' : 'LOGIN_SUCCESS',
+        status: 'SUCCESS',
+        actor: user.login,
+        ip: request.remote_ip
+      )
       user.post_successful_login
       set_current_user user
     else

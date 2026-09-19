@@ -83,7 +83,13 @@ class ActiveSupport::TestCase
   def set_session_user(user = :admin)
     user = user.is_a?(User) ? user : users(user)
     user.update_column(:has_active_session, true) unless user.has_active_session?
-    {:user => user.id, :expires_at => 5.minutes.from_now}
+    {
+      :user => user.id,
+      :expires_at => 5.minutes.from_now,
+      # Simulate successful interactive login (Phase 1: login counts as fresh for local/LDAP).
+      :reauthenticated_at => Time.now.utc.to_i,
+      :reauth_actor_id => user.id,
+    }
   end
 
   def as_user(user)
@@ -113,6 +119,9 @@ class ActiveSupport::TestCase
     user = User.find_by_login("one")
     @request.session[:user] = user.id
     @request.session[:expires_at] = 5.minutes.from_now.to_i
+    @request.session[:reauthenticated_at] = Time.now.utc.to_i
+    @request.session[:reauth_actor_id] = user.id
+    user.update_column(:has_active_session, true) unless user.has_active_session?
     user.roles = [Role.default, Role.find_by_name('Viewer')]
     user.save!
   end

@@ -16,7 +16,7 @@ module Mutations
     let(:variables) do
       {
         username: user.login,
-        password: 'password',
+        password: 'Password1!',
       }
     end
     let(:query) do
@@ -58,6 +58,22 @@ module Mutations
       result = ForemanGraphqlSchema.execute(query, context: context, variables: variables)
       assert_empty result['errors']
 
+      assert_nil result['data']['signInUser']
+    end
+
+    test 'does not sign a locked local user in via GraphQL' do
+      Setting[:account_lockout_attempts] = 5
+      Setting[:account_lockout_window] = 15
+      Setting[:account_lockout_duration] = 30
+
+      5.times do
+        ForemanGraphqlSchema.execute(query, context: context, variables: variables.merge(password: 'wrong-password'))
+      end
+
+      user.reload
+      assert user.account_locked?
+
+      result = ForemanGraphqlSchema.execute(query, context: context, variables: variables)
       assert_nil result['data']['signInUser']
     end
   end

@@ -53,6 +53,8 @@ class UsergroupsController < ApplicationController
   end
 
   def terminate_active_sessions
+    return unless ensure_reauthenticated!('users.terminate_sessions')
+
     user_ids = @usergroup.all_users.map(&:id)
     User.terminate_active_sessions_for(user_ids)
     process_success(:success_msg => _('Successfully terminated active sessions for user group %s.') % @usergroup.name)

@@ -8,6 +8,8 @@ $(function() {
       url: url,
       success: function(response) {
         item.text(__(response.status));
+        // Message may contain escaped HTML breaks from errors_hash; keep html:true
+        // only for those breaks — content is escaped server-side.
         item.attr('title', response.message);
         if (response.status === 'OK') {
           item.addClass('label label-success');

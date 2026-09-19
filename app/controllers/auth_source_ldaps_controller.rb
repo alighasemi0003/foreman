@@ -9,6 +9,8 @@ class AuthSourceLdapsController < ApplicationController
 
   def create
     @auth_source_ldap = AuthSourceLdap.new(auth_source_ldap_params)
+    return unless ensure_reauthenticated!('auth_sources.create')
+
     if @auth_source_ldap.save
       process_success :success_redirect => auth_sources_path
     else
@@ -20,6 +22,8 @@ class AuthSourceLdapsController < ApplicationController
   end
 
   def update
+    return unless ensure_reauthenticated!('auth_sources.update')
+
     if @auth_source_ldap.update(auth_source_ldap_params)
       process_success :success_redirect => auth_sources_path
     else
@@ -28,6 +32,8 @@ class AuthSourceLdapsController < ApplicationController
   end
 
   def destroy
+    return unless ensure_reauthenticated!('auth_sources.destroy')
+
     if @auth_source_ldap.destroy
       process_success :success_redirect => auth_sources_path
     else

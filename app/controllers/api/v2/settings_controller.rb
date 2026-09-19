@@ -58,6 +58,8 @@ module Api
           render_error(:custom_error, status: :unprocessable_entity, locals: { message: _("No setting value provided.") })
           return
         end
+        return unless ensure_meta_settings_reauthenticated!(@setting.name)
+
         @setting = Foreman.settings.set_user_value(@setting.name, value)
         process_response @setting.save
       rescue Foreman::SettingValueException => e

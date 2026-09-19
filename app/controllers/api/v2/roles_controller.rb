@@ -34,6 +34,8 @@ module Api
       param_group :role, :as => :create
 
       def create
+        return unless ensure_reauthenticated!('users.change_roles')
+
         @role = Role.new(role_params)
         process_response @role.save
       end
@@ -43,6 +45,8 @@ module Api
       param_group :role
 
       def update
+        return unless ensure_reauthenticated!('users.change_roles')
+
         process_response @role.update(role_params)
       end
 
@@ -50,6 +54,8 @@ module Api
       param :id, String, :required => true
 
       def destroy
+        return unless ensure_reauthenticated!('users.change_roles')
+
         process_response @role.destroy
       end
 
@@ -57,6 +63,8 @@ module Api
       param :id, String, :required => true
       param_group :role
       def clone
+        return unless ensure_reauthenticated!('users.change_roles')
+
         @role = @role.clone(role_params)
         process_response @role.save
       end

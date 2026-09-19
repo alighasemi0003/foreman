@@ -29,6 +29,8 @@ class RegistrationCommandsController < ApplicationController
   end
 
   def create
+    return unless ensure_reauthenticated!('registration_commands.create')
+
     render json: { command: command }
   end
 

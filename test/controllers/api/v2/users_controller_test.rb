@@ -3,11 +3,11 @@ require 'test_helper'
 class Api::V2::UsersControllerTest < ActionController::TestCase
   def valid_attrs
     { :mail => 'john@example.com',
-      :auth_source_id => auth_sources(:internal), :password => '123456' }
+      :auth_source_id => auth_sources(:internal), :password => 'Password1!' }
   end
 
   def min_valid_attrs
-    { :login => "foo", :auth_source_id => auth_sources(:internal).id, :password => '123456' }
+    { :login => "foo", :auth_source_id => auth_sources(:internal).id, :password => 'Password1!' }
   end
 
   # List of invalid emails.
@@ -119,26 +119,26 @@ class Api::V2::UsersControllerTest < ActionController::TestCase
 
   test "should set password" do
     user          = User.new :login => "foo", :mail => "foo@bar.com", :firstname => "john", :lastname => "smith", :auth_source => auth_sources(:internal)
-    user.password = "changeme"
+    user.password = "Password1!"
     assert user.save
 
-    put :update, params: { :id => user.id, :user => { :login => "johnsmith", :password => "dummy", :password_confirmation => "dummy" } }
+    put :update, params: { :id => user.id, :user => { :login => "johnsmith", :password => "Dummy1!aa", :password_confirmation => "Dummy1!aa" } }
     assert_response :success
 
     mod_user = User.unscoped.find_by_id(user.id)
-    assert mod_user.matching_password?("dummy")
+    assert mod_user.matching_password?("Dummy1!aa")
   end
 
   test "should detect password validation mismatches" do
     user          = User.new :login => "foo", :mail => "foo@bar.com", :firstname => "john", :lastname => "smith", :auth_source => auth_sources(:internal)
-    user.password = "changeme"
+    user.password = "Password1!"
     assert user.save
 
-    put :update, params: { :id => user.id, :user => { :login => "johnsmith", :password => "dummy", :password_confirmation => "DUMMY" } }
+    put :update, params: { :id => user.id, :user => { :login => "johnsmith", :password => "Dummy1!aa", :password_confirmation => "DUMMY" } }
     assert_response :unprocessable_entity
 
     mod_user = User.unscoped.find_by_id(user.id)
-    assert mod_user.matching_password?("changeme")
+    assert mod_user.matching_password?("Password1!")
   end
 
   test "should delete different user" do
@@ -243,7 +243,7 @@ class Api::V2::UsersControllerTest < ActionController::TestCase
     end
     assert_response :success
     user.reload
-    assert user.matching_password?("123456")
+    assert user.matching_password?("Password1!")
   end
 
   test "#update should allow updating myself without any special permissions without changing password" do
@@ -264,7 +264,7 @@ class Api::V2::UsersControllerTest < ActionController::TestCase
     refute_equal user.object_id, assigns(:user).object_id
     assert_response :success
     user.reload
-    assert user.matching_password?('123456')
+    assert user.matching_password?('Password1!')
   end
 
   test '#update should not be editing User.current without changing password' do
@@ -330,7 +330,7 @@ class Api::V2::UsersControllerTest < ActionController::TestCase
   end
 
   test "should create with valid password" do
-    password = RFauxFactory.gen_alpha
+    password = "ValidPass1!"
     post :create, params: { :user => min_valid_attrs.clone.update(:password => password) }
     assert_response :success, "creation with password #{password} failed with code #{response.code}"
   end

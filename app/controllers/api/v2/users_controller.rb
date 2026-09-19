@@ -87,6 +87,8 @@ module Api
       param_group :user, :as => :create
 
       def create
+        return unless ensure_reauthenticated!('users.create')
+
         @user = User.new(user_params)
         if @user.save
           process_success
@@ -104,8 +106,13 @@ module Api
       param_group :user_update
 
       def update
+        return unless ensure_user_update_reauthenticated!(@user, user_params)
+
         if @user.update(user_params)
           update_sub_hostgroups_owners
+          if editing_self? && user_params[:password].present?
+            Foreman::Reauthentication.clear!(session)
+          end
 
           process_success
         else
@@ -120,6 +127,8 @@ module Api
         if @user == User.current
           deny_access N_("You are trying to delete your own account")
         else
+          return unless ensure_reauthenticated!('users.destroy')
+
           process_response @user.destroy
         end
       end

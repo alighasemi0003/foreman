@@ -13,6 +13,8 @@ class FiltersController < ApplicationController
 
   def create
     @filter = Filter.new(filter_params)
+    return unless ensure_reauthenticated!('users.change_roles')
+
     if @filter.save
       process_success :success_redirect => saved_redirect_url_or(filters_path(:role_id => @role))
     else
@@ -22,6 +24,8 @@ class FiltersController < ApplicationController
 
   def update
     @filter = resource_base.find(params[:id])
+    return unless ensure_reauthenticated!('users.change_roles')
+
     if @filter.update(filter_params)
       process_success :success_redirect => saved_redirect_url_or(filters_path(:role_id => @role))
     else
@@ -31,6 +35,8 @@ class FiltersController < ApplicationController
 
   def destroy
     @filter = resource_base.find(params[:id])
+    return unless ensure_reauthenticated!('users.change_roles')
+
     if @filter.destroy
       process_success :success_redirect => saved_redirect_url_or(filters_path(:role_id => @role))
     else

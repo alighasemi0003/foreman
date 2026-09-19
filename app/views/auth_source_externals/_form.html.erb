@@ -1,4 +1,4 @@
-<%= form_for @auth_source_external do |f| %>
+<%= form_for @auth_source_external, :html => { :data => { :foreman_reauth => true } } do |f| %>
   <%= base_errors_for @auth_source_external %>
   <ul class="nav nav-tabs" data-tabs="tabs">
     <% tab_classes = tab_classes_for_edit_auth_source_external %>

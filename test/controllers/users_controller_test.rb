@@ -259,7 +259,7 @@ class UsersControllerTest < ActionController::TestCase
     @request.env['HTTP_REFERER'] = users_path
     user = users(:one)
     user.update_attribute :admin, true
-    delete :destroy, params: { :id => user.id }, session: set_session_user.merge(:user => user.id)
+    delete :destroy, params: { :id => user.id }, session: set_session_user(user)
     assert_redirected_to users_url
     assert User.unscoped.exists?(user.id)
     assert_equal @request.flash[:warning][:message], 'You cannot delete this user while logged in as this user'
@@ -290,7 +290,7 @@ class UsersControllerTest < ActionController::TestCase
       "login" => user.login,
       "mail" => "you@have.mail"},
       "id" => user.id}
-    put :update, params: update_hash, session: set_session_user.merge(:user => user.id)
+    put :update, params: update_hash, session: set_session_user(user)
 
     assert User.unscoped.find_by_login(user.login).mail.present?
   end
@@ -438,9 +438,10 @@ class UsersControllerTest < ActionController::TestCase
 
   test "check_active_session logs out users whose active session was terminated" do
     user = users(:admin)
+    session_hash = set_session_user(user)
     user.update_column(:has_active_session, false)
 
-    get :index, session: set_session_user(user)
+    get :index, session: session_hash
 
     assert_redirected_to login_users_path
     assert_equal _("Your session has been terminated."), flash[:inline][:warning]

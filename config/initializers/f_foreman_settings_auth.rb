@@ -27,6 +27,21 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Foreman will block user logins from an IP address after this number of failed login attempts for 5 minutes. Set to 0 to disable bruteforce protection"),
       default: 30,
       full_name: N_('Failed login attempts limit'))
+    setting('account_lockout_attempts',
+      type: :integer,
+      description: N_("Number of consecutive failed password attempts against a local (internal) user account within the lockout window before the account is temporarily locked. Does not apply to LDAP or external authentication providers."),
+      default: 5,
+      full_name: N_('Account lockout attempts'))
+    setting('account_lockout_window',
+      type: :integer,
+      description: N_("Time window in minutes during which failed password attempts against a local user account are counted toward account lockout."),
+      default: 15,
+      full_name: N_('Account lockout window (minutes)'))
+    setting('account_lockout_duration',
+      type: :integer,
+      description: N_("How long in minutes a local user account remains locked after reaching the failed password attempt threshold. The account unlocks automatically when this period expires."),
+      default: 30,
+      full_name: N_('Account lockout duration (minutes)'))
     setting('restrict_registered_smart_proxies',
       type: :boolean,
       description: N_('Only known Smart Proxies may access features that use Smart Proxy authentication'),
@@ -170,5 +185,116 @@ Foreman::SettingManager.define(:foreman) do
       default: 'image',
       full_name: N_('CAPTCHA type'),
       collection: proc { { 'image' => _("Image"), 'audio' => _("Audio"), 'both' => _("Both Image and Audio") } })
+
+    # Step-up / re-authentication (Phase 1 foundation)
+    setting('reauthentication_window_minutes',
+      type: :integer,
+      description: N_("How long in minutes a successful re-authentication remains valid for sensitive actions in the same browser session. Changing this setting always requires re-authentication."),
+      default: 5,
+      full_name: N_('Re-authentication window (minutes)'))
+    validates('reauthentication_window_minutes',
+      ->(value) { value.to_i.between?(1, 30) },
+      message: N_("must be between 1 and 30"))
+
+    setting('require_reauth_users_set_admin',
+      type: :boolean,
+      description: N_("Require re-authentication before granting or revoking the administrator flag on a user"),
+      default: true,
+      full_name: N_('Require re-authentication to change admin flag'))
+    setting('require_reauth_users_set_disabled',
+      type: :boolean,
+      description: N_("Require re-authentication before enabling or disabling a user account"),
+      default: true,
+      full_name: N_('Require re-authentication to enable/disable users'))
+    setting('require_reauth_users_impersonate',
+      type: :boolean,
+      description: N_("Require re-authentication before impersonating another user"),
+      default: true,
+      full_name: N_('Require re-authentication to impersonate'))
+    setting('require_reauth_auth_sources_update',
+      type: :boolean,
+      description: N_("Require re-authentication before updating an authentication source (e.g. LDAP)"),
+      default: true,
+      full_name: N_('Require re-authentication to update auth sources'))
+    setting('require_reauth_users_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting a user"),
+      default: true,
+      full_name: N_('Require re-authentication to delete users'))
+    setting('require_reauth_users_change_password',
+      type: :boolean,
+      description: N_("Require re-authentication before changing another user's password"),
+      default: true,
+      full_name: N_('Require re-authentication to change other users passwords'))
+    setting('require_reauth_users_change_roles',
+      type: :boolean,
+      description: N_("Require re-authentication before changing user role membership or role/filter definitions"),
+      default: true,
+      full_name: N_('Require re-authentication to change roles'))
+    setting('require_reauth_auth_sources_create',
+      type: :boolean,
+      description: N_("Require re-authentication before creating an authentication source"),
+      default: true,
+      full_name: N_('Require re-authentication to create auth sources'))
+    setting('require_reauth_auth_sources_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting an authentication source"),
+      default: true,
+      full_name: N_('Require re-authentication to delete auth sources'))
+    setting('require_reauth_users_terminate_sessions',
+      type: :boolean,
+      description: N_("Require re-authentication before terminating user sessions"),
+      default: true,
+      full_name: N_('Require re-authentication to terminate sessions'))
+    setting('require_reauth_users_invalidate_jwt',
+      type: :boolean,
+      description: N_("Require re-authentication before invalidating user registration JWTs"),
+      default: true,
+      full_name: N_('Require re-authentication to invalidate JWTs'))
+    setting('require_reauth_users_create',
+      type: :boolean,
+      description: N_("Require re-authentication before creating a user"),
+      default: true,
+      full_name: N_('Require re-authentication to create users'))
+    setting('require_reauth_personal_access_tokens_create',
+      type: :boolean,
+      description: N_("Require re-authentication before creating a personal access token"),
+      default: true,
+      full_name: N_('Require re-authentication to create personal access tokens'))
+    setting('require_reauth_personal_access_tokens_revoke',
+      type: :boolean,
+      description: N_("Require re-authentication before revoking a personal access token"),
+      default: true,
+      full_name: N_('Require re-authentication to revoke personal access tokens'))
+    setting('require_reauth_ssh_keys_create',
+      type: :boolean,
+      description: N_("Require re-authentication before adding an SSH public key to a user"),
+      default: true,
+      full_name: N_('Require re-authentication to create SSH keys'))
+    setting('require_reauth_ssh_keys_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting a user SSH public key"),
+      default: true,
+      full_name: N_('Require re-authentication to delete SSH keys'))
+    setting('require_reauth_registration_commands_create',
+      type: :boolean,
+      description: N_("Require re-authentication before generating a host registration command (issues a registration JWT)"),
+      default: true,
+      full_name: N_('Require re-authentication to generate registration commands'))
+    setting('require_reauth_key_pairs_download',
+      type: :boolean,
+      description: N_("Require re-authentication before downloading a compute resource SSH private key (PEM)"),
+      default: true,
+      full_name: N_('Require re-authentication to download compute SSH private keys'))
+    setting('require_reauth_key_pairs_recreate',
+      type: :boolean,
+      description: N_("Require re-authentication before recreating a compute resource SSH key pair"),
+      default: true,
+      full_name: N_('Require re-authentication to recreate compute SSH key pairs'))
+    setting('require_reauth_key_pairs_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting a compute resource SSH key"),
+      default: true,
+      full_name: N_('Require re-authentication to delete compute SSH keys'))
   end
 end

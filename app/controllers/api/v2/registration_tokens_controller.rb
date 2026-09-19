@@ -34,6 +34,8 @@ module Api
 
       def invalidate_jwt
         @user = find_resource(:edit_users)
+        return unless ensure_reauthenticated!('users.invalidate_jwt')
+
         @user.jwt_secret&.destroy
         login = @user.login
         render :json => { :message => _("Successfully invalidated registration tokens."), :user => login}, :status => :ok
@@ -47,6 +49,8 @@ module Api
 
       def invalidate_jwt_tokens
         raise ::Foreman::Exception.new(N_("Please provide search parameter")) if params[:search].blank?
+        return unless ensure_reauthenticated!('users.invalidate_jwt')
+
         @users = resource_scope_for_index(:permission => :edit_users).except_hidden.uniq
         if @users.blank?
           raise ::Foreman::Exception.new(N_("No record found for search '%s'"), params[:search]) end

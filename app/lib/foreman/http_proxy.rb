@@ -24,8 +24,9 @@ module Foreman
 
     def http_proxied_rescue(&block)
       yield
-    rescue => e
-      raise e, _("Proxied request failed with: %s\n%s") % [e, e&.backtrace&.join("\n")]
+    rescue StandardError => e
+      Foreman::Logging.exception(_("Proxied request failed with: %s") % e.message, e)
+      raise e.class, _("Proxied request failed with: %s") % e.message
     end
 
     private

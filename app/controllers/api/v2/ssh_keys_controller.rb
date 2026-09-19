@@ -34,6 +34,8 @@ module Api
       param_group :ssh_key, :as => :create
 
       def create
+        return unless ensure_reauthenticated!('ssh_keys.create')
+
         @ssh_key = SshKey.new(ssh_key_params.merge(:user => @user))
         process_response @ssh_key.save
       end
@@ -43,6 +45,8 @@ module Api
       param :user_id, String, :desc => N_("ID of the user"), :required => true
 
       def destroy
+        return unless ensure_reauthenticated!('ssh_keys.destroy')
+
         process_response @ssh_key.destroy
       end
     end

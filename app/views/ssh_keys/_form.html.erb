@@ -1,4 +1,4 @@
-<%= form_for @ssh_key, :url => user_ssh_keys_path(:user_id => @user) do |f| %>
+<%= form_for @ssh_key, :url => user_ssh_keys_path(:user_id => @user), :html => { :data => { :foreman_reauth => true } } do |f| %>
   <%= base_errors_for @ssh_key %>
   <% if @ssh_key.errors.include?(:fingerprint) || @ssh_key.errors.include?(:length) %>
     <p><%= _('Please correct the error(s) below and submit your changes again.') %></p>

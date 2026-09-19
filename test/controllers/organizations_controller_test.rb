@@ -190,7 +190,7 @@ class OrganizationsControllerTest < ActionController::TestCase
 
   test "should clear out Organization.current to any" do
     @request.env['HTTP_REFERER'] = root_url
-    get :clear, session: set_session_user
+    post :clear, session: set_session_user
     assert_nil Organization.current
     assert_equal '', session[:organization_id]
     assert_redirected_to root_url

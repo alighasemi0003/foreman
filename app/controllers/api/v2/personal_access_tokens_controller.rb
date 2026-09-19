@@ -34,6 +34,8 @@ module Api
       param_group :personal_access_token, :as => :create
 
       def create
+        return unless ensure_reauthenticated!('personal_access_tokens.create')
+
         @personal_access_token = PersonalAccessToken.new(personal_access_token_params.merge(:user => @user))
         @token_value = @personal_access_token.generate_token
         process_response @personal_access_token.save
@@ -44,6 +46,8 @@ module Api
       param :user_id, String, :desc => N_("ID of the user"), :required => true
 
       def destroy
+        return unless ensure_reauthenticated!('personal_access_tokens.revoke')
+
         process_response @personal_access_token.revoke!
       end
 

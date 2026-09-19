@@ -16,9 +16,15 @@ $(document).on('ContentLoad', function() {
 
 $(window).on('hashchange', tfm.tools.setTab); //so buttons that link to an anchor can open that tab
 
+function escapeHtmlAttr(text) {
+  return $('<div/>')
+    .text(text == null ? '' : String(text))
+    .html();
+}
+
 function setItemStatus(item, response) {
   if (response.success && response.message && response.message.warning) {
-    item.attr('title', response.message.warning.message);
+    item.attr('title', escapeHtmlAttr(response.message.warning.message));
     item.addClass('text-warning');
     item.html(tfm.tools.iconText('warning-triangle-o', '', 'pficon'));
   } else if (response.success) {
@@ -26,7 +32,7 @@ function setItemStatus(item, response) {
     item.addClass('text-success');
     item.html(tfm.tools.iconText('ok', '', 'pficon'));
   } else {
-    item.attr('title', response.message);
+    item.attr('title', escapeHtmlAttr(response.message));
     item.addClass('text-danger');
     item.html(tfm.tools.iconText('error-circle-o', '', 'pficon'));
   }
@@ -56,7 +62,7 @@ function generateItem(item, status, text) {
   if (status === true) {
     item.text(text);
   } else {
-    item.attr('title', text);
+    item.attr('title', escapeHtmlAttr(text));
     item.addClass('text-danger');
     item.html(tfm.tools.iconText('error-circle-o', '', 'pficon'));
   }

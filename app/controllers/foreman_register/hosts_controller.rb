@@ -65,13 +65,12 @@ module ForemanRegister
       render plain: template.render(host: @host, params: params)
     rescue StandardError => e
       Foreman::Logging.exception("Error rendering the #{template.name} template", e)
-      message = N_("There was an error rendering the %{name} template: %{error}") % { name: template.name, error: e }
+      message = _("There was an error rendering the %{name} template") % { name: template.name }
 
       render_error(
         message: message,
         status: :internal_server_error,
-        name: template.name,
-        error: e.message
+        name: template.name
       )
     end
   end
