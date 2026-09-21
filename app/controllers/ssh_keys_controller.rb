@@ -9,6 +9,8 @@ class SshKeysController < ApplicationController
   end
 
   def create
+    return unless ensure_reauthenticated!('ssh_keys.create')
+
     @ssh_key = SshKey.new(ssh_key_params.merge(:user => @user))
     if @ssh_key.save
       process_success :success_redirect => edit_user_path(@user)
@@ -18,6 +20,8 @@ class SshKeysController < ApplicationController
   end
 
   def destroy
+    return unless ensure_reauthenticated!('ssh_keys.destroy')
+
     if @ssh_key.destroy
       process_success :success_redirect => edit_user_path(@user)
     else

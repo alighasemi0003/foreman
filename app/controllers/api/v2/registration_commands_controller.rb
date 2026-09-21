@@ -28,6 +28,8 @@ module Api
         param :download_utility, ["curl", "wget"], desc: N_("The download utility to use during host registration")
       end
       def create
+        return unless ensure_reauthenticated!('registration_commands.create')
+
         unless os_with_template?
           message = N_("Operating system doesn't have a 'host_init_config' template assigned.")
           render_error 'custom_error', status: :unprocessable_entity, locals: { message: message }

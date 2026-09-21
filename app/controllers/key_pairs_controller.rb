@@ -11,11 +11,15 @@ class KeyPairsController < ApplicationController
   end
 
   def show
+    return unless ensure_reauthenticated!('key_pairs.download')
+
     @key_pair.update(audit_comment: _("%{user} Downloaded %{key} as pem file") % {user: User.current.name, key: @key_pair.name})
     send_data @key_pair.secret, :filename => "#{@key_pair.name}.pem"
   end
 
   def create
+    return unless ensure_reauthenticated!('key_pairs.recreate')
+
     if @compute_resource.recreate
       process_success :success_msg => _('Successfully recreated'),
         :success_redirect => compute_resource_path(@compute_resource)
@@ -25,6 +29,8 @@ class KeyPairsController < ApplicationController
   end
 
   def destroy
+    return unless ensure_reauthenticated!('key_pairs.destroy')
+
     key_to_delete = params[:id]
     return not_found unless key_to_delete
     if @compute_resource.delete_key_from_resource(key_to_delete)
