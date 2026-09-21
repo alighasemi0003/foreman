@@ -22,6 +22,7 @@ class IntlLoader {
     addLocaleData(localeData);
     Cookies.set('timezone', jstz.determine().name(), {
       path: '/',
+      sameSite: 'Lax',
       secure: window.location.protocol === 'https:',
     });
     return true;

@@ -142,6 +142,8 @@ module Foreman
     # config.plugins = [ :exception_notification, :ssl_requirement, :all ]
 
     config.force_ssl = SETTINGS[:require_ssl]
+    # When force_ssl is enabled, ActionDispatch::SSL redirects all HTTP requests to HTTPS
+    # except Foreman::ForceSsl exemptions (unattended/userdata when unattended_url is http).
     config.ssl_options = {
       redirect: {
         exclude: ->(request) { Foreman::ForceSsl.new(request).allows_http? },
@@ -237,6 +239,9 @@ module Foreman
     config.action_dispatch.trusted_proxies = SETTINGS.fetch(:trusted_proxies, %w(127.0.0.1/8 ::1)).map { |proxy| IPAddr.new(proxy) }
 
     # Record request and session tokens in logging MDC
+    # Do not expose request timing via X-Runtime (reconnaissance / fingerprinting).
+    config.middleware.delete Rack::Runtime
+
     config.middleware.insert_before Rails::Rack::Logger, Foreman::Middleware::LoggingContextRequest
     config.middleware.insert_after ActionDispatch::Session::ActiveRecordStore, Foreman::Middleware::LoggingContextSession
 
@@ -336,8 +341,16 @@ module Foreman
       end
     end
 
-    # Use the database for sessions instead of the cookie-based default
-    config.session_store :active_record_store, :secure => !!SETTINGS[:require_ssl]
+    # Use the database for sessions instead of the cookie-based default.
+    # Explicit security attributes (do not rely solely on Rack/Rails defaults):
+    # - secure: HTTPS when SETTINGS[:require_ssl] (aligned with force_ssl)
+    # - httponly: block document.cookie access to the session id
+    # - same_site: Lax — defense in depth; CSRF tokens remain primary CSRF control
+    config.session_store :active_record_store,
+      :key => '_session_id',
+      :secure => !!SETTINGS[:require_ssl],
+      :httponly => true,
+      :same_site => :lax
 
     # We need to mount the sprockets engine before we use the routes_reloader
     initializer(:mount_sprocket_env, :before => :sooner_routes_load) do
