@@ -36,6 +36,12 @@ const ConfirmModal = () => {
     closeModal();
   };
 
+  // Esc / X must cancel like the Cancel button so callers awaiting a Promise settle.
+  const handleClose = () => {
+    onCancel();
+    closeModal();
+  };
+
   const actions = [
     <Button
       key="confirm"
@@ -76,7 +82,7 @@ const ConfirmModal = () => {
       variant={ModalVariant.small}
       title={title}
       isOpen={isOpen}
-      onClose={closeModal}
+      onClose={handleClose}
       actions={actions}
       titleIconVariant={isWarning ? 'warning' : null}
       {...modalProps}
