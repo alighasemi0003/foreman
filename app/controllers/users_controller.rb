@@ -8,7 +8,7 @@ class UsersController < ApplicationController
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
   skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
-  skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation]
+  skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation, :reauthenticate]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
   before_action      :verify_active_session, :only => :login
@@ -129,12 +129,96 @@ class UsersController < ApplicationController
   def stop_impersonation
     if session[:impersonated_by].present?
       user = User.unscoped.find_by_id(session[:impersonated_by])
+      unless user
+        session[:impersonated_by] = nil
+        User.impersonator = nil
+        render :json => { :message => _("No active impersonate session."), :type => :warning }
+        return
+      end
       session[:user] = user.id
       session[:impersonated_by] = nil
       User.impersonator = nil
+      Foreman::Reauthentication.clear!(session)
       render :json => { :message => _("You now act as %s again.") % user.name, :type => :success }
     else
       render :json => { :message => _("No active impersonate session."), :type => :warning }
+    end
+  end
+
+  # Confirm identity for step-up authentication (interactive session only).
+  def reauthenticate
+    unless Foreman::Reauthentication.interactive_session?(session)
+      render json: {
+        error: {
+          message: _('Re-authentication is only available for interactive sessions.'),
+          status: 'reauthentication_unsupported',
+        },
+      }, status: :forbidden
+      return
+    end
+
+    actor = Foreman::Reauthentication.real_actor(session)
+    # Browser modal sends top-level JSON { password }; wrap_parameters may also nest under :user.
+    password = params[:password].presence ||
+               params.dig(:reauthentication, :password).presence ||
+               params.dig(:user, :password).presence
+    result = Foreman::Reauthentication::Verifier.new(
+      actor: actor,
+      password: password,
+      request_ip: request.remote_ip
+    ).call
+
+    case result.status
+    when :success
+      Foreman::Reauthentication.mark_authenticated!(session, actor)
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_SUCCESS',
+        status: 'SUCCESS',
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'success', message: result.message }, status: :ok
+    when :reauthentication_unsupported
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_UNSUPPORTED',
+        status: 'DENIED',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'reauthentication_unsupported', message: result.message }, status: :unprocessable_entity
+    when :account_locked
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_FAILED',
+        status: 'LOCKED',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'account_locked', message: result.message }, status: :forbidden
+    when :rate_limited
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_FAILED',
+        status: 'DENIED',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: 'rate_limited'
+      )
+      render json: { status: 'rate_limited', message: result.message }, status: :too_many_requests
+    else
+      Foreman::SecurityEvent.log(
+        event: 'REAUTH_FAILED',
+        status: 'FAILURE',
+        level: :warn,
+        actor: actor&.login,
+        ip: request.remote_ip,
+        details: impersonation_details
+      )
+      render json: { status: 'authentication_failed', message: result.message }, status: :unauthorized
     end
   end
 
@@ -231,6 +315,7 @@ class UsersController < ApplicationController
       nil,
       :auditable_id => user_id
     )
+    Foreman::Reauthentication.clear!(session)
     session[:user] = @user = User.current = nil
     if flash[:success] || flash[:info] || flash[:error]
       flash.keep
@@ -271,6 +356,11 @@ class UsersController < ApplicationController
     logger.info("User '#{user.login}' logged in from '#{request.ip}'")
     log_authentication_event('login', user, "User '#{user.login}' logged in")
     session[:user]         = user.id
+    if Foreman::Reauthentication.marks_login_as_fresh?(user)
+      Foreman::Reauthentication.mark_authenticated!(session, user)
+    else
+      Foreman::Reauthentication.clear!(session)
+    end
     uri                    = session.to_hash.with_indifferent_access[:original_uri]
     session[:original_uri] = nil
     store_default_taxonomy(user, 'organization') unless session.has_key?(:organization_id)

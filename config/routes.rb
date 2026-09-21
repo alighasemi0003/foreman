@@ -253,6 +253,7 @@ Foreman::Application.routes.draw do
       get 'extlogin'
       get 'extlogout'
       get 'auto_complete_search'
+      post 'reauthenticate'
       delete 'stop_impersonation'
       delete 'invalidate_jwt_for_all_users'
     end

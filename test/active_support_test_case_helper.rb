@@ -82,7 +82,12 @@ class ActiveSupport::TestCase
 
   def set_session_user(user = :admin)
     user = user.is_a?(User) ? user : users(user)
-    {:user => user.id, :expires_at => 5.minutes.from_now}
+    {
+      :user => user.id,
+      :expires_at => 5.minutes.from_now,
+      Foreman::Reauthentication::SESSION_AT => Time.now.utc.to_i,
+      Foreman::Reauthentication::SESSION_ACTOR => user.id,
+    }
   end
 
   def as_user(user)

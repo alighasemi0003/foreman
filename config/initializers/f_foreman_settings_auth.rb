@@ -174,5 +174,116 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("The algorithm used to encode the JWT in the OpenID provider."),
       default: nil,
       full_name: N_('OIDC Algorithm'))
+
+    # Step-up / re-authentication (policy infrastructure; sensitive-action enforcement is later)
+    setting('reauthentication_window_minutes',
+      type: :integer,
+      description: N_("How long in minutes a successful re-authentication remains valid for sensitive actions in the same browser session. Changing this setting always requires re-authentication."),
+      default: 5,
+      full_name: N_('Re-authentication window (minutes)'))
+    validates('reauthentication_window_minutes',
+      ->(value) { value.to_i.between?(1, 30) },
+      message: N_("must be between 1 and 30"))
+
+    setting('require_reauth_users_set_admin',
+      type: :boolean,
+      description: N_("Require re-authentication before granting or revoking the administrator flag on a user"),
+      default: true,
+      full_name: N_('Require re-authentication to change admin flag'))
+    setting('require_reauth_users_set_disabled',
+      type: :boolean,
+      description: N_("Require re-authentication before enabling or disabling a user account"),
+      default: true,
+      full_name: N_('Require re-authentication to enable/disable users'))
+    setting('require_reauth_users_impersonate',
+      type: :boolean,
+      description: N_("Require re-authentication before impersonating another user"),
+      default: true,
+      full_name: N_('Require re-authentication to impersonate'))
+    setting('require_reauth_auth_sources_update',
+      type: :boolean,
+      description: N_("Require re-authentication before updating an authentication source (e.g. LDAP)"),
+      default: true,
+      full_name: N_('Require re-authentication to update auth sources'))
+    setting('require_reauth_users_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting a user"),
+      default: true,
+      full_name: N_('Require re-authentication to delete users'))
+    setting('require_reauth_users_change_password',
+      type: :boolean,
+      description: N_("Require re-authentication before changing another user's password"),
+      default: true,
+      full_name: N_('Require re-authentication to change other users passwords'))
+    setting('require_reauth_users_change_roles',
+      type: :boolean,
+      description: N_("Require re-authentication before changing user role membership or role/filter definitions"),
+      default: true,
+      full_name: N_('Require re-authentication to change roles'))
+    setting('require_reauth_auth_sources_create',
+      type: :boolean,
+      description: N_("Require re-authentication before creating an authentication source"),
+      default: true,
+      full_name: N_('Require re-authentication to create auth sources'))
+    setting('require_reauth_auth_sources_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting an authentication source"),
+      default: true,
+      full_name: N_('Require re-authentication to delete auth sources'))
+    setting('require_reauth_users_terminate_sessions',
+      type: :boolean,
+      description: N_("Require re-authentication before terminating user sessions"),
+      default: true,
+      full_name: N_('Require re-authentication to terminate sessions'))
+    setting('require_reauth_users_invalidate_jwt',
+      type: :boolean,
+      description: N_("Require re-authentication before invalidating user registration JWTs"),
+      default: true,
+      full_name: N_('Require re-authentication to invalidate JWTs'))
+    setting('require_reauth_users_create',
+      type: :boolean,
+      description: N_("Require re-authentication before creating a user"),
+      default: true,
+      full_name: N_('Require re-authentication to create users'))
+    setting('require_reauth_personal_access_tokens_create',
+      type: :boolean,
+      description: N_("Require re-authentication before creating a personal access token"),
+      default: true,
+      full_name: N_('Require re-authentication to create personal access tokens'))
+    setting('require_reauth_personal_access_tokens_revoke',
+      type: :boolean,
+      description: N_("Require re-authentication before revoking a personal access token"),
+      default: true,
+      full_name: N_('Require re-authentication to revoke personal access tokens'))
+    setting('require_reauth_ssh_keys_create',
+      type: :boolean,
+      description: N_("Require re-authentication before adding an SSH public key to a user"),
+      default: true,
+      full_name: N_('Require re-authentication to create SSH keys'))
+    setting('require_reauth_ssh_keys_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting a user SSH public key"),
+      default: true,
+      full_name: N_('Require re-authentication to delete SSH keys'))
+    setting('require_reauth_registration_commands_create',
+      type: :boolean,
+      description: N_("Require re-authentication before generating a host registration command (issues a registration JWT)"),
+      default: true,
+      full_name: N_('Require re-authentication to generate registration commands'))
+    setting('require_reauth_key_pairs_download',
+      type: :boolean,
+      description: N_("Require re-authentication before downloading a compute resource SSH private key (PEM)"),
+      default: true,
+      full_name: N_('Require re-authentication to download compute SSH private keys'))
+    setting('require_reauth_key_pairs_recreate',
+      type: :boolean,
+      description: N_("Require re-authentication before recreating a compute resource SSH key pair"),
+      default: true,
+      full_name: N_('Require re-authentication to recreate compute SSH key pairs'))
+    setting('require_reauth_key_pairs_destroy',
+      type: :boolean,
+      description: N_("Require re-authentication before deleting a compute resource SSH key"),
+      default: true,
+      full_name: N_('Require re-authentication to delete compute SSH keys'))
   end
 end
