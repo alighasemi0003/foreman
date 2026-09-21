@@ -14,6 +14,7 @@ class Template < ApplicationRecord
   validates :audit_comment, :length => {:maximum => 255}
   validate :template_changes, :if => :run_template_changes_validation?
   validate :inputs_unchanged_when_locked, :if => :run_template_changes_validation?
+  validate :template_byte_size_within_limit
   validate do
     validate_unique_inputs!
   rescue Foreman::Exception => e
@@ -66,7 +67,8 @@ class Template < ApplicationRecord
   end
 
   def filename
-    name.downcase.delete('-').gsub(/\s+/, '_') + '.erb'
+    raw = name.to_s.downcase.delete('-').gsub(/\s+/, '_') + '.erb'
+    Foreman::UploadSecurity.safe_download_filename(raw, default: 'template.erb')
   end
 
   def ignore_locking
@@ -333,5 +335,13 @@ class Template < ApplicationRecord
     if inputs_changed
       errors.add(:base, _('This template is locked. Please clone it to a new template to customize.'))
     end
+  end
+
+  def template_byte_size_within_limit
+    return if template.blank?
+    max = Foreman::UploadSecurity::MAX_TEMPLATE_BYTES
+    return if template.bytesize <= max
+
+    errors.add(:template, _('is too large (maximum is %s bytes)') % max)
   end
 end

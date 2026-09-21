@@ -19,6 +19,7 @@ class HttpProxy < ApplicationRecord
   validates :name, :presence => true, :uniqueness => true
 
   validates :url, :format => { :with => /\Ahttps?:\/\// }, :presence => true
+  validate :cacert_must_be_valid_pem_bundle, :if => -> { cacert.present? }
 
   # with proc support, default_scope can no longer be chained
   # include all default scoping here
@@ -68,5 +69,11 @@ class HttpProxy < ApplicationRecord
   def nilify_empty_credentials
     self.username = nil if username.empty?
     self.password = nil if password.empty?
+  end
+
+  def cacert_must_be_valid_pem_bundle
+    Foreman::UploadSecurity.validate_cacert!(cacert)
+  rescue Foreman::UploadSecurity::InvalidCacert => e
+    errors.add(:cacert, e.message)
   end
 end

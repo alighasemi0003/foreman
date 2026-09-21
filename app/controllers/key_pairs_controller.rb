@@ -14,7 +14,8 @@ class KeyPairsController < ApplicationController
     return unless ensure_reauthenticated!('key_pairs.download')
 
     @key_pair.update(audit_comment: _("%{user} Downloaded %{key} as pem file") % {user: User.current.name, key: @key_pair.name})
-    send_data @key_pair.secret, :filename => "#{@key_pair.name}.pem"
+    filename = Foreman::UploadSecurity.safe_download_filename("#{@key_pair.name}.pem", default: 'key.pem')
+    send_data @key_pair.secret, :filename => filename, :disposition => 'attachment', :type => 'application/x-pem-file'
   end
 
   def create

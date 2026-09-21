@@ -114,7 +114,8 @@ class TemplatesController < ApplicationController
   end
 
   def export
-    send_data @template.to_erb, :type => 'text/plain', :disposition => 'attachment', :filename => @template.filename
+    send_data @template.to_erb, :type => 'text/plain', :disposition => 'attachment',
+      :filename => @template.filename
   end
 
   def resource_class

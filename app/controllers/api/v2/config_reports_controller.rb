@@ -3,10 +3,12 @@ module Api
     class ConfigReportsController < V2::BaseController
       include Api::Version2
       include Foreman::Controller::SmartProxyAuth
+      include Foreman::Controller::RequestBodySizeLimit
 
       before_action :find_resource, :only => %w{destroy}
       before_action :setup_search_options, :only => [:index, :last]
       before_action :compatibility, :only => :create
+      before_action -> { reject_oversized_request_body(Foreman::UploadSecurity::MAX_CONFIG_REPORT_BODY_BYTES) }, :only => :create
 
       add_smart_proxy_filters :create, :features => proc { ReportImporter.authorized_smart_proxy_features }
 
