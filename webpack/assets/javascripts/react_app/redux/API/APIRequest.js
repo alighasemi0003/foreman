@@ -2,10 +2,19 @@
 import { getApiResponse } from './APIHelpers';
 import { actionTypeGenerator } from './APIActionTypeGenerator';
 import { noop } from '../../common/helpers';
+import {
+  isReauthenticationRequired,
+  isReauthenticateEndpoint,
+  promptReauthentication,
+  reauthenticationAction,
+  reauthenticationSupported,
+} from '../../common/Reauthentication';
 import { stopInterval } from '../middlewares/IntervalMiddleware';
 import { selectDoesIntervalExist } from '../middlewares/IntervalMiddleware/IntervalSelectors';
 import { selectAPIResponse } from './APISelectors';
 import { addToast } from '../../components/ToastsList';
+
+const MAX_REAUTH_RETRIES = 1;
 
 export const apiRequest = async (
   {
@@ -24,7 +33,8 @@ export const apiRequest = async (
       updateData,
     },
   },
-  { dispatch, getState }
+  { dispatch, getState },
+  reauthAttempt = 0
 ) => {
   const prevState = getState();
   const { REQUEST, SUCCESS, FAILURE, UPDATE } = actionTypeGenerator(
@@ -36,11 +46,13 @@ export const apiRequest = async (
     ? () => dispatch(stopInterval(key))
     : () => console.warn(`There's no interval API request for the key: ${key}`);
 
-  dispatch({
-    type: REQUEST,
-    key,
-    payload: modifiedPayload,
-  });
+  if (reauthAttempt === 0) {
+    dispatch({
+      type: REQUEST,
+      key,
+      payload: modifiedPayload,
+    });
+  }
 
   try {
     const response = await getApiResponse({ type, url, headers, params });
@@ -70,6 +82,42 @@ export const apiRequest = async (
 
     handleSuccess(response, stopIntervalCallback);
   } catch (error) {
+    // Never recurse: reauth endpoint failures are handled by the modal itself.
+    if (
+      !isReauthenticateEndpoint(url) &&
+      isReauthenticationRequired(error) &&
+      reauthAttempt < MAX_REAUTH_RETRIES
+    ) {
+      try {
+        await promptReauthentication({
+          action: reauthenticationAction(error),
+          unsupported: !reauthenticationSupported(error),
+        });
+        return apiRequest(
+          {
+            type,
+            payload: {
+              key,
+              url,
+              headers,
+              params,
+              actionTypes,
+              handleError,
+              handleSuccess,
+              successToast,
+              errorToast,
+              payload,
+              updateData,
+            },
+          },
+          { dispatch, getState },
+          reauthAttempt + 1
+        );
+      } catch (reauthError) {
+        // cancelled or failed — fall through to failure handling
+      }
+    }
+
     dispatch({
       type: FAILURE,
       key,

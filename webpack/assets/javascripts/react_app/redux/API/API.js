@@ -11,6 +11,18 @@ const getcsrfToken = () => {
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.headers.common['X-CSRF-Token'] = getcsrfToken();
 
+// Always refresh CSRF from the live meta tag. Module-load defaults can be
+// empty/stale (e.g. Module Federation eval timing), which breaks POSTs such as
+// /users/reauthenticate and surfaces as a generic "Authentication failed".
+axios.interceptors.request.use(config => {
+  const token = getcsrfToken();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['X-CSRF-Token'] = token;
+  }
+  return config;
+});
+
 export default {
   get(url, headers = {}, params = {}) {
     return axios.get(foremanUrl(url), {
