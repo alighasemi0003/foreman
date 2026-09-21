@@ -22,6 +22,8 @@ class UsersController < ApplicationController
   end
 
   def create
+    return unless ensure_reauthenticated!('users.create')
+
     @user = User.new(user_params)
     if @user.save
       process_success
@@ -41,8 +43,10 @@ class UsersController < ApplicationController
   def update
     editing_self?
     @user = find_resource(:edit_users)
+    return unless ensure_user_update_reauthenticated!(@user, user_params)
     if @user.update(user_params)
       update_sub_hostgroups_owners
+      clear_reauth_after_password_change_if_needed!
 
       process_success((editing_self? && !current_user.allowed_to?({:controller => 'users', :action => 'index'})) ? { :success_redirect => helpers.current_hosts_path } : { :success_redirect => users_path })
     else
@@ -65,6 +69,8 @@ class UsersController < ApplicationController
       return
     end
 
+    return unless ensure_reauthenticated!('users.destroy')
+
     if @user.destroy
       process_success
     else
@@ -73,6 +79,8 @@ class UsersController < ApplicationController
   end
 
   def impersonate
+    return unless ensure_reauthenticated!('users.impersonate')
+
     user = User.enabled.find_by_id(params[:id])
     if user.nil?
       warning _("User is disabled")
@@ -104,6 +112,8 @@ class UsersController < ApplicationController
   end
 
   def invalidate_jwt_for_all_users
+    return unless ensure_reauthenticated!('users.invalidate_jwt')
+
     user_ids = User.authorized(:edit_users).ids.uniq
     JwtSecret.where(user_id: user_ids).destroy_all
     process_success(
@@ -113,6 +123,8 @@ class UsersController < ApplicationController
 
   def invalidate_jwt
     @user = find_resource(:edit_users)
+    return unless ensure_reauthenticated!('users.invalidate_jwt')
+
     @user.jwt_secret&.destroy
     respond_to do |format|
       format.html do
@@ -350,6 +362,13 @@ class UsersController < ApplicationController
 
   def find_resource(permission = :view_users)
     editing_self? ? User.find(User.current.id) : User.authorized(permission).except_hidden.find(params[:id])
+  end
+
+  def clear_reauth_after_password_change_if_needed!
+    return unless editing_self?
+    return if user_params[:password].blank?
+
+    Foreman::Reauthentication.clear!(session)
   end
 
   def login_user(user)

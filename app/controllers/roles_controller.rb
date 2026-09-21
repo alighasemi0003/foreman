@@ -31,6 +31,7 @@ class RolesController < ApplicationController
 
   def create
     @role = role_from_form
+    return unless ensure_reauthenticated!('users.change_roles')
 
     if @role.save
       process_success
@@ -54,6 +55,8 @@ class RolesController < ApplicationController
   end
 
   def update
+    return unless ensure_reauthenticated!('users.change_roles')
+
     if @role.update(role_params)
       process_success
     else
@@ -62,6 +65,8 @@ class RolesController < ApplicationController
   end
 
   def destroy
+    return unless ensure_reauthenticated!('users.change_roles')
+
     if @role.destroy
       process_success
     else
