@@ -1430,7 +1430,7 @@ class HostsControllerTest < ActionController::TestCase
     HostsController.any_instance.stubs(:resource_finder).returns(@host)
     @host.errors.add(:test, 'my error')
     @host.interfaces = [] # force save failure
-    get :cancelBuild, params: { id: @host.name }, session: set_session_user
+    put :cancelBuild, params: { id: @host.name }, session: set_session_user
 
     assert_response :redirect
     assert_match(/Failed to cancel/, flash[:error])

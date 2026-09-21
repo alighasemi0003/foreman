@@ -178,7 +178,7 @@ class LocationsControllerTest < ActionController::TestCase
 
   test "should clear out Location.current and set current location to any in session" do
     @request.env['HTTP_REFERER'] = root_url
-    get :clear, session: set_session_user
+    post :clear, session: set_session_user
     assert_nil Location.current
     assert_equal '', session[:location_id]
     assert_redirected_to root_url

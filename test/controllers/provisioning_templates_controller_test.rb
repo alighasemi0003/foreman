@@ -137,7 +137,7 @@ class ProvisioningTemplatesControllerTest < ActionController::TestCase
 
     test "build menu" do
       ProxyAPI::TFTP.any_instance.expects(:create_default).with(regexp_matches(/^PXE.*/), has_entry(:menu, regexp_matches(/ks=http:\/\/foreman.unattended.url\/unattended\/template/))).returns(true).times(2)
-      get :build_pxe_default, session: set_session_user
+      post :build_pxe_default, session: set_session_user
       assert flash[:success].present?
       assert_empty flash[:error]
       assert_redirected_to provisioning_templates_path
@@ -145,7 +145,7 @@ class ProvisioningTemplatesControllerTest < ActionController::TestCase
 
     test "build menu should return with error code if no TFTP defined" do
       SmartProxy.stubs(:with_features).with('TFTP').returns([])
-      get :build_pxe_default, session: set_session_user
+      post :build_pxe_default, session: set_session_user
       assert flash[:error].present?
     end
 
@@ -157,7 +157,7 @@ class ProvisioningTemplatesControllerTest < ActionController::TestCase
       t1.save
       t2.save
       ProxyAPI::TFTP.any_instance.expects(:create_default).with(regexp_matches(/^PXE.*/), has_entry(:menu, regexp_matches(/#{hostgroups(:common).name}.*#{hostgroups(:db).name}/m))).returns(true).times(2)
-      get :build_pxe_default, session: set_session_user
+      post :build_pxe_default, session: set_session_user
       assert_redirected_to provisioning_templates_path
     end
 
@@ -166,7 +166,7 @@ class ProvisioningTemplatesControllerTest < ActionController::TestCase
       t1.provisioning_template = templates(:mystring2)
       t1.save
       ProxyAPI::TFTP.any_instance.expects(:create_default).with(regexp_matches(/^PXE.*/), has_entry(:menu, regexp_matches(/ks=http:\/\/foreman.unattended.url\/unattended\/template\/MyString2\/Parent\/inherited/))).returns(true).times(2)
-      get :build_pxe_default, session: set_session_user
+      post :build_pxe_default, session: set_session_user
       assert_redirected_to provisioning_templates_path
     end
 
@@ -176,7 +176,7 @@ class ProvisioningTemplatesControllerTest < ActionController::TestCase
       FactoryBot.create(:template_combination, :provisioning_template => templates(:mystring2), :hostgroup => second)
       FactoryBot.create(:template_combination, :provisioning_template => templates(:mystring2), :hostgroup => first)
       ProxyAPI::TFTP.any_instance.expects(:create_default).with(regexp_matches(/^PXE.*/), has_entry(:menu, regexp_matches(/#{first.name}.*#{second.name}/m))).returns(true).times(2)
-      get :build_pxe_default, session: set_session_user
+      post :build_pxe_default, session: set_session_user
       assert_redirected_to provisioning_templates_path
     end
 
@@ -187,7 +187,7 @@ class ProvisioningTemplatesControllerTest < ActionController::TestCase
       Redhat.any_instance.expects(:pxe_files) do |_medium_provider, _arch, host|
         host.name == "hg"
       end.at_least(1)
-      get :build_pxe_default, session: set_session_user
+      post :build_pxe_default, session: set_session_user
       assert_redirected_to provisioning_templates_path
     end
   end

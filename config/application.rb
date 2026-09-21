@@ -246,6 +246,9 @@ module Foreman
     # Do not expose request timing via X-Runtime (reconnaissance / fingerprinting).
     config.middleware.delete Rack::Runtime
 
+    # Reject TRACE/TRACK/CONNECT/WebDAV and other non-application HTTP methods early.
+    config.middleware.insert_before 0, Foreman::Middleware::RejectUnsafeHttpMethods
+
     config.middleware.insert_before Rails::Rack::Logger, Foreman::Middleware::LoggingContextRequest
     config.middleware.insert_after ActionDispatch::Session::ActiveRecordStore, Foreman::Middleware::LoggingContextSession
 

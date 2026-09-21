@@ -47,7 +47,8 @@ Foreman::Application.routes.draw do
         get 'clone'
         get 'review_before_build'
         put 'setBuild'
-        get 'cancelBuild'
+        # PUT (not GET): canceling a build mutates host state and must be CSRF-protected
+        put 'cancelBuild'
         get 'build_errors'
         get 'pxe_config'
         put 'toggle_manage'
@@ -327,7 +328,8 @@ Foreman::Application.routes.draw do
 
   resources :provisioning_templates, only: [] do
     collection do
-      get 'build_pxe_default'
+      # POST: deploys PXE defaults to TFTP; must be CSRF-protected
+      post 'build_pxe_default'
     end
   end
 
@@ -486,7 +488,8 @@ Foreman::Application.routes.draw do
   resources :locations, except: [:show] do
     resources :hosts, only: :index
     member do
-      get 'select'
+      # POST: switches session taxonomy context; must be CSRF-protected
+      post 'select'
       get "clone" => 'locations#clone_taxonomy'
       get 'nest'
       post 'import_mismatches'
@@ -498,7 +501,8 @@ Foreman::Application.routes.draw do
     end
     collection do
       get 'auto_complete_search'
-      get 'clear'
+      # POST: clears session taxonomy context; must be CSRF-protected
+      post 'clear'
       get  'mismatches'
       post 'import_mismatches'
     end
@@ -506,7 +510,8 @@ Foreman::Application.routes.draw do
 
   resources :organizations, except: [:show] do
     member do
-      get 'select'
+      # POST: switches session taxonomy context; must be CSRF-protected
+      post 'select'
       get "clone" => 'organizations#clone_taxonomy'
       get 'nest'
       post 'import_mismatches'
@@ -518,7 +523,8 @@ Foreman::Application.routes.draw do
     end
     collection do
       get 'auto_complete_search'
-      get 'clear'
+      # POST: clears session taxonomy context; must be CSRF-protected
+      post 'clear'
       get  'mismatches'
       post 'import_mismatches'
     end

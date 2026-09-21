@@ -1,9 +1,19 @@
+jest.mock('../../../../common/helpers', () => {
+  const actual = jest.requireActual('../../../../common/helpers');
+  return {
+    ...actual,
+    postWithCsrf: jest.fn(),
+  };
+});
+
 import TaxonomySwitcher from './TaxonomySwitcher';
 import { layoutData } from '../../Layout.fixtures';
 import ForemanContext from '../../../../Root/Context/ForemanContext';
+import { postWithCsrf } from '../../../../common/helpers';
 
 import React from 'react';
 import { fireEvent, screen, render, act } from '@testing-library/react';
+
 const props = {
   organizations: layoutData.orgs.available_organizations,
   locations: layoutData.locations.available_locations,
@@ -16,14 +26,12 @@ jest
 jest
   .spyOn(ForemanContext, 'useForemanOrganization')
   .mockReturnValue({ title: 'org1' });
-const assign = jest.fn();
-Object.defineProperty(window, 'location', {
-  value: {
-    assign,
-  },
-  writable: true,
-});
+
 describe('TaxonomySwitcher', () => {
+  beforeEach(() => {
+    postWithCsrf.mockClear();
+  });
+
   it('should switch orgs and locations', async () => {
     render(<TaxonomySwitcher {...props} />);
     expect(screen.getAllByText('london')).toHaveLength(1);
@@ -36,7 +44,7 @@ describe('TaxonomySwitcher', () => {
     await act(async () => {
       fireEvent.click(screen.getByText('norway'));
     });
-    expect(assign).toHaveBeenLastCalledWith('/locations/3-norway/select');
+    expect(postWithCsrf).toHaveBeenLastCalledWith('/locations/3-norway/select');
 
     await act(async () => {
       fireEvent.click(screen.getByText('org1'));
@@ -47,6 +55,8 @@ describe('TaxonomySwitcher', () => {
     await act(async () => {
       fireEvent.click(screen.getByText('org2'));
     });
-    expect(assign).toHaveBeenLastCalledWith('/organizations/2-org2/select');
+    expect(postWithCsrf).toHaveBeenLastCalledWith(
+      '/organizations/2-org2/select'
+    );
   });
 });

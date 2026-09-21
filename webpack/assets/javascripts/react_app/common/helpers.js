@@ -211,6 +211,29 @@ export const visit = url => {
   window.location.href = url;
 };
 
+/**
+ * Navigate via POST so CSRF-protected, state-changing routes cannot be forged with GET.
+ * Uses the Rails authenticity token from the page meta tag.
+ */
+export const postWithCsrf = url => {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = url;
+  form.style.display = 'none';
+
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  if (csrfMeta && csrfMeta.content) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'authenticity_token';
+    input.value = csrfMeta.content;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  form.submit();
+};
+
 export const reloadPage = () => {
   window.location.reload();
 };
@@ -233,6 +256,7 @@ export default {
   formatDate,
   formatDateTime,
   foremanUrl,
+  postWithCsrf,
   getWikiURL,
   visit,
   reloadPage,
