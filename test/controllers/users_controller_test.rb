@@ -29,7 +29,7 @@ class UsersControllerTest < ActionController::TestCase
         :login          => 'foo',
         :mail           => 'foo@bar.com',
         :auth_source_id => auth_sources(:internal).id,
-        :password       => 'changeme',
+        :password       => 'Password1!',
       },
     }, session: set_session_user
     assert_redirected_to users_path
@@ -43,7 +43,7 @@ class UsersControllerTest < ActionController::TestCase
         :admin          => true,
         :mail           => 'foo@bar.com',
         :auth_source_id => auth_sources(:internal).id,
-        :password       => 'changeme',
+        :password       => 'Password1!',
       },
     }, session: set_session_user
     assert_redirected_to users_path
@@ -94,39 +94,39 @@ class UsersControllerTest < ActionController::TestCase
 
   test "should set password" do
     user = User.new :login => "foo", :mail => "foo@bar.com", :firstname => "john", :lastname => "smith", :auth_source => auth_sources(:internal)
-    user.password = "changeme"
+    user.password = "Password1!"
     assert user.save
 
     put :update, params: { :id => user.id,
                            :user => {
-                             :login => "johnsmith", :password => "dummy", :password_confirmation => "dummy"
+                             :login => "johnsmith", :password => "Dummy1!aa", :password_confirmation => "Dummy1!aa"
                            },
                  }, session: set_session_user
 
     mod_user = User.unscoped.find_by_id(user.id)
 
-    assert mod_user.matching_password?("dummy")
+    assert mod_user.matching_password?("Dummy1!aa")
     assert_redirected_to users_path
   end
 
   test "should detect password validation mismatches" do
     user = User.new :login => "foo", :mail => "foo@bar.com", :firstname => "john", :lastname => "smith", :auth_source => auth_sources(:internal)
-    user.password = "changeme"
+    user.password = "Password1!"
     assert user.save
 
     put :update, params: { :id => user.id,
                   :user => {
-                    :login => "johnsmith", :password => "dummy", :password_confirmation => "DUMMY"
+                    :login => "johnsmith", :password => "Dummy1!aa", :password_confirmation => "DUMMY"
                   },
                 }, session: set_session_user
     user.reload
-    assert user.matching_password?("changeme")
+    assert user.matching_password?("Password1!")
     assert_template :edit
   end
 
   test "should not ask for confirmation if no password is set" do
     user = User.new :login => "foo", :mail => "foo@bar.com", :firstname => "john", :lastname => "smith", :auth_source => auth_sources(:internal)
-    user.password = "changeme"
+    user.password = "Password1!"
     assert user.save
 
     put :update, params: { :id => user.id,
@@ -137,17 +137,17 @@ class UsersControllerTest < ActionController::TestCase
   end
 
   test "current user have to enter current password to change password" do
-    user = FactoryBot.create(:user, :password => 'password')
+    user = FactoryBot.create(:user, :password => 'Password1!')
     User.current = user
 
     put :update, params: { :id => user.id,
                            :user => {
-                             :current_password => "password", :password => "newpassword", :password_confirmation => "newpassword"
+                             :current_password => "Password1!", :password => "NewPass2!", :password_confirmation => "NewPass2!"
                            },
     }, session: set_session_user
 
     user.reload
-    assert user.matching_password?("newpassword")
+    assert user.matching_password?("NewPass2!")
     assert_redirected_to users_path
   end
 

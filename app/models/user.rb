@@ -17,6 +17,7 @@ class User < ApplicationRecord
   include TopbarCacheExpiry
   include JwtAuth
   include UserAccountLockout
+  include UserPasswordComplexity
   include Foreman::ObservableModel
 
   ANONYMOUS_ADMIN = 'foreman_admin'
@@ -568,8 +569,15 @@ class User < ApplicationRecord
   end
 
   def self.random_password(size = 16)
-    set = ('a'..'z').to_a + ('A'..'Z').to_a + ('0'..'9').to_a - %w(0 1 O I l)
-    Array.new(size) { set.sample }.join
+    size = [size, UserPasswordComplexity::MINIMUM_LENGTH].max
+    letters = (('a'..'z').to_a + ('A'..'Z').to_a) - %w(O I l)
+    digits = ('2'..'9').to_a
+    specials = %w(! @ # $ % & * - _)
+    pool = letters + digits + specials
+    # Guarantee letter, digit, and special character for local password policy.
+    chars = [letters.sample, digits.sample, specials.sample]
+    chars.concat(Array.new(size - chars.length) { pool.sample })
+    chars.shuffle.join
   end
 
   def expire_topbar_cache

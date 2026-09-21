@@ -209,9 +209,9 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "user should login case insensitively" do
-    user = User.new :auth_source => auth_sources(:internal), :login => "user", :mail => "foo1@bar.com", :password => "foo"
+    user = User.new :auth_source => auth_sources(:internal), :login => "user", :mail => "foo1@bar.com", :password => "Password1!"
     assert user.save!
-    assert_equal user, User.try_to_login("USER", "foo")
+    assert_equal user, User.try_to_login("USER", "Password1!")
   end
 
   test "user login should be case aware" do
@@ -236,7 +236,7 @@ class UserTest < ActiveSupport::TestCase
   test "new internal user gets welcome mail" do
     ActionMailer::Base.deliveries = []
     Setting[:send_welcome_email] = true
-    User.create :auth_source => auth_sources(:internal), :login => "welcome", :mail => "foo@example.com", :password => "qux", :mail_enabled => true
+    User.create :auth_source => auth_sources(:internal), :login => "welcome", :mail => "foo@example.com", :password => "Password1!", :mail_enabled => true
     mail = ActionMailer::Base.deliveries.detect { |delivery| delivery.subject =~ /Welcome to Foreman/ }
     assert mail
     assert_match /Username/, mail.body.encoded
@@ -261,13 +261,13 @@ class UserTest < ActiveSupport::TestCase
 
     test ".try_to_login and failing AuthSource should return nil" do
       u = FactoryBot.create(:user)
-      AuthSourceInternal.any_instance.expects(:authenticate).with(u.login, 'password').returns(nil)
-      refute User.try_to_login(u.login, 'password')
+      AuthSourceInternal.any_instance.expects(:authenticate).with(u.login, 'wrong-password').returns(nil)
+      refute User.try_to_login(u.login, 'wrong-password')
     end
 
     test ".try_to_login should return user on successful login" do
       u = FactoryBot.create(:user)
-      assert_equal u, User.try_to_login(u.login, 'password')
+      assert_equal u, User.try_to_login(u.login, 'Password1!')
     end
 
     test "updates usergroups on login" do
@@ -1042,17 +1042,17 @@ class UserTest < ActiveSupport::TestCase
   test "#matching_password? succeeds if password matches" do
     u = FactoryBot.build_stubbed(:user)
     assert_valid u
-    assert u.matching_password?('password')
+    assert u.matching_password?('Password1!')
   end
 
   test "#matching_password? succeeds if password matches with higher cost" do
     user = FactoryBot.build_stubbed(:user)
     hasher = Foreman::PasswordHash.new(:sha1)
     user.password_salt = hasher.generate_salt(10)
-    user.password_hash = hasher.hash_secret('password', user.password_salt)
+    user.password_hash = hasher.hash_secret('Password1!', user.password_salt)
     assert_valid user
     Setting[:bcrypt_cost] = 15
-    assert user.matching_password?('password')
+    assert user.matching_password?('Password1!')
   ensure
     Setting[:bcrypt_cost] = 10
   end
@@ -1067,9 +1067,9 @@ class UserTest < ActiveSupport::TestCase
     hasher = Foreman::PasswordHash.new(:sha1)
     u = FactoryBot.build_stubbed(:user)
     u.password_salt = hasher.generate_salt(0)
-    u.password_hash = hasher.hash_secret('password', u.password_salt)
-    u.expects(:upgrade_password).with('password')
-    assert u.matching_password?('password')
+    u.password_hash = hasher.hash_secret('Password1!', u.password_salt)
+    u.expects(:upgrade_password).with('Password1!')
+    assert u.matching_password?('Password1!')
   end
 
   test "#matching_password? does not upgrade for no reason" do
@@ -1103,11 +1103,16 @@ class UserTest < ActiveSupport::TestCase
 
   context ".random_password" do
     it "should return password" do
-      assert_match /\A[a-zA-Z0-9]{16}\z/, User.random_password
+      pwd = User.random_password
+      assert_operator pwd.length, :>=, 8
+      assert_match(/[[:alpha:]]/, pwd)
+      assert_match(/[[:digit:]]/, pwd)
+      assert_match(/[^[:alnum:][:space:]]/, pwd)
+      assert UserPasswordComplexity.compliant?(pwd)
     end
 
     it "should not return ambiguous characters" do
-      refute_match /[O0Il1]/, User.random_password(100)
+      refute_match(/[O0Il1]/, User.random_password(100))
     end
   end
 
@@ -1172,8 +1177,8 @@ class UserTest < ActiveSupport::TestCase
   test "changing user password as admin without setting current password" do
     user = FactoryBot.create(:user, :mail => "foo@bar.com")
     as_admin do
-      user.password = "newpassword"
-      assert user.save
+      user.password = "NewPass1!"
+      assert user.save, user.errors.full_messages.to_sentence
     end
   end
 
@@ -1181,18 +1186,18 @@ class UserTest < ActiveSupport::TestCase
     user = FactoryBot.create(:user, :mail => "foo@bar.com")
     as_user user do
       user.current_password = "hatatitla"
-      user.password = "newpassword"
+      user.password = "NewPass1!"
       refute user.valid?
       assert user.errors.messages.has_key? :current_password
     end
   end
 
   test "changing user's own password with correct current password" do
-    user = FactoryBot.create(:user, :password => "password", :mail => "foo@bar.com")
+    user = FactoryBot.create(:user, :password => "Password1!", :mail => "foo@bar.com")
     as_user user do
-      user.current_password = "password"
-      user.password = "newpassword"
-      assert user.save
+      user.current_password = "Password1!"
+      user.password = "NewPass2!"
+      assert user.save, user.errors.full_messages.to_sentence
     end
   end
 
@@ -1272,7 +1277,7 @@ class UserTest < ActiveSupport::TestCase
     let (:user_login) { FactoryBot.create(:user, :locations => [Location.first], :organizations => [Organization.first]) }
     let (:external_user) { FactoryBot.create(:user, :auth_source => auth_source_ldap, :locations => user_login.locations, :organizations => user_login.organizations) }
     let (:external_user_manager) { FactoryBot.create(:user, :auth_source => auth_source_ldap, :locations => user_login.locations, :organizations => user_login.organizations, :roles => [roles(:manager)]) }
-    let (:internal_user) { FactoryBot.create(:user, :locations => user_login.locations, :organizations => user_login.organizations, :mail => "foo@bar.com",  :current_password => "password") }
+    let (:internal_user) { FactoryBot.create(:user, :locations => user_login.locations, :organizations => user_login.organizations, :mail => "foo@bar.com",  :current_password => "Password1!") }
     let (:internal_user_manager) { FactoryBot.create(:user, :locations => user_login.locations, :organizations => user_login.organizations, :roles => [roles(:manager)]) }
 
     test 'Internal user can update his own login' do

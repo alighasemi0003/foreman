@@ -11,7 +11,7 @@ FactoryBot.define do
 
   factory :user do
     auth_source { AuthSourceInternal.first }
-    password { 'password' }
+    password { 'Password1!' }
     sequence(:login) { |n| "user#{n}" }
     organizations { [Organization.find_or_initialize_by(name: 'Organization 1')] }
     locations { [Location.find_or_initialize_by(name: 'Location 1')] }
