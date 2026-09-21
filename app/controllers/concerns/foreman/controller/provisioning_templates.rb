@@ -24,9 +24,13 @@ module Foreman::Controller::ProvisioningTemplates
   end
 
   # convert the file upload into a simple string to save in our db.
+  # Bound read size so an oversized multipart body is not fully loaded.
   def handle_template_upload
     return unless params[type_name_singular] && (template = params[type_name_singular][:template])
-    params[type_name_singular][:template] = template.read if template.respond_to?(:read)
+    return unless template.respond_to?(:read) && !template.is_a?(String)
+
+    max = Foreman::UploadSecurity::MAX_TEMPLATE_BYTES
+    params[type_name_singular][:template] = template.read(max + 1)
   end
 
   def process_template_kind

@@ -263,21 +263,72 @@ class AuthSourceLdapTest < ActiveSupport::TestCase
   context 'save external avatar' do
     let(:temp_dir) { Dir.mktmpdir }
 
+    # Minimal JPEG with SOI + EOI for signature validation.
+    def minimal_jpeg
+      ("\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00".b +
+        ("\x00".b * 32) + "\xFF\xD9".b)
+    end
+
     setup do
       AuthSourceLdap.any_instance.stubs(:avatar_path).returns(temp_dir)
     end
 
-    test 'store_avatar can save 8bit ascii files' do
+    test 'store_avatar saves valid JPEG from base64' do
       auth = AuthSourceLdap.new
-      file = File.open("#{temp_dir}/out.txt", 'wb+')
-      file_string = File.open(file, 'rb') { |f| f.read } # set the file_string to binary
-      file_string += 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVQYV2P4DwABAQEAWk1v8QAAAABJRU5ErkJggg=='
-      avatar_hash = Digest::SHA1.hexdigest(file_string)
-      assert_equal(Encoding::ASCII_8BIT, file_string.encoding)
+      jpeg = minimal_jpeg
+      encoded = Base64.strict_encode64(jpeg)
+      avatar_hash = Digest::SHA1.hexdigest(jpeg)
       assert_nothing_raised do
-        auth.send(:store_avatar, file_string)
+        assert_equal avatar_hash, auth.send(:store_avatar, encoded)
       end
       assert(File.exist?("#{temp_dir}/#{avatar_hash}.jpg"))
+      assert_equal jpeg, File.binread("#{temp_dir}/#{avatar_hash}.jpg")
+    ensure
+      FileUtils.remove_entry temp_dir
+    end
+
+    test 'store_avatar rejects HTML and returns nil' do
+      auth = AuthSourceLdap.new
+      assert_nil auth.send(:store_avatar, Base64.strict_encode64('<html>xss</html>' + ('x' * 40)))
+      assert_equal [], Dir.children(temp_dir)
+    ensure
+      FileUtils.remove_entry temp_dir
+    end
+
+    test 'store_avatar rejects SVG and does not write' do
+      auth = AuthSourceLdap.new
+      assert_nil auth.send(:store_avatar, Base64.strict_encode64('<svg xmlns="http://www.w3.org/2000/svg"></svg>' + ('x' * 40)))
+      assert_equal [], Dir.children(temp_dir)
+    ensure
+      FileUtils.remove_entry temp_dir
+    end
+
+    test 'store_avatar rejects oversized JPEG' do
+      auth = AuthSourceLdap.new
+      huge = ("\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00".b +
+        ("\x00".b * (Foreman::UploadSecurity::MAX_AVATAR_BYTES)) + "\xFF\xD9".b)
+      assert_nil auth.send(:store_avatar, Base64.strict_encode64(huge))
+      assert_equal [], Dir.children(temp_dir)
+    ensure
+      FileUtils.remove_entry temp_dir
+    end
+
+    test 'store_avatar rejects zero-byte input' do
+      auth = AuthSourceLdap.new
+      assert_nil auth.send(:store_avatar, '')
+      assert_nil auth.send(:store_avatar, Base64.strict_encode64(''))
+    ensure
+      FileUtils.remove_entry temp_dir
+    end
+
+    test 'store_avatar uses server-generated name only' do
+      auth = AuthSourceLdap.new
+      jpeg = minimal_jpeg
+      hash = auth.send(:store_avatar, Base64.strict_encode64(jpeg))
+      refute_nil hash
+      assert_match(/\A[0-9a-f]{40}\z/, hash)
+      assert File.exist?("#{temp_dir}/#{hash}.jpg")
+      refute Dir.children(temp_dir).any? { |n| n.include?('..') || n.include?('/') }
     ensure
       FileUtils.remove_entry temp_dir
     end

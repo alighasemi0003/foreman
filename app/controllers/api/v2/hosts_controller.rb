@@ -6,6 +6,7 @@ module Api
       include ScopesPerAction
       include Foreman::Controller::SmartProxyAuth
       include Foreman::Controller::Parameters::Host
+      include Foreman::Controller::RequestBodySizeLimit
       include ParameterAttributes
 
       wrap_parameters :host, :include => host_params_filter.accessible_attributes(parameter_filter_context) + ['compute_attributes']
@@ -15,6 +16,7 @@ module Api
       before_action :find_resource, :except => [:index, :create, :facts]
       check_permissions_for %w{power boot}
       before_action :process_parameter_attributes, :only => %w{update}
+      before_action -> { reject_oversized_request_body(Foreman::UploadSecurity::MAX_FACTS_BODY_BYTES) }, :only => :facts
 
       add_smart_proxy_filters :facts, :features => proc { Foreman::Plugin.fact_importer_registry.fact_features }
 

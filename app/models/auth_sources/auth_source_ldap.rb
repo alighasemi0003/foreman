@@ -246,7 +246,9 @@ class AuthSourceLdap < AuthSource
     Hash[required_ldap_attributes.merge(optional_ldap_attributes).map do |name, value|
       next if value.blank? || (entry[value].blank? && optional_ldap_attributes.key?(name))
       if name.eql? :avatar
-        [:avatar_hash, store_avatar(entry[value].first)]
+        hash = store_avatar(entry[value].first)
+        next if hash.blank?
+        [:avatar_hash, hash]
       else
         value = entry[value].is_a?(Array) ? entry[value].first : entry[value]
         [name, value.to_s]
@@ -258,23 +260,21 @@ class AuthSourceLdap < AuthSource
     "#{Rails.public_path}/images/avatars"
   end
 
+  # Persist LDAP jpegPhoto as a server-named JPEG under public/images/avatars.
+  # Validates size + JPEG magic before write; never uses a client/LDAP filename.
   def store_avatar(avatar)
-    unless avatar.instance_of?(Net::BER::BerIdentifiedString)
-      avatar = avatar.to_utf8
+    binary = Foreman::UploadSecurity.extract_avatar_binary(avatar)
+    unless binary
+      Foreman::Logging.logger('app').warn('Rejected LDAP avatar: invalid or oversized image')
+      return nil
     end
-    avatar_hash = Digest::SHA1.hexdigest(avatar)
+
+    # Hash the validated binary so storage identity matches file content.
+    avatar_hash = Digest::SHA1.hexdigest(binary)
     avatar_file = "#{avatar_path}/#{avatar_hash}.jpg"
     unless FileTest.exist? avatar_file
       FileUtils.mkdir_p(avatar_path)
-      # net/ldap converts base64 data automatically to binary, in such case
-      # we do not need to decode Base64 and we can just save the binary avatar.
-      File.open(avatar_file, 'wb') do |f|
-        if avatar.instance_of?(Net::BER::BerIdentifiedString)
-          f.write(avatar)
-        else
-          f.write(Base64.decode64(avatar))
-        end
-      end
+      File.open(avatar_file, 'wb') { |f| f.write(binary) }
     end
     avatar_hash
   end
