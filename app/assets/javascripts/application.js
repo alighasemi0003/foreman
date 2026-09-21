@@ -491,7 +491,7 @@ function setError(field, text) {
   form_group.addClass('has-error');
   var help_block = form_group.children('.help-inline').first();
   var span = $(document.createElement('span'));
-  span.addClass('error-message').html(text);
+  span.addClass('error-message').text(text);
   help_block.prepend(span);
 }
 
