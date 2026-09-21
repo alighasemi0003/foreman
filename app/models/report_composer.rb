@@ -225,7 +225,7 @@ class ReportComposer
     name = @template.suggested_report_name.to_s
     name += '.' + format.extension
     name += '.gz' if gzip?
-    name
+    Foreman::UploadSecurity.safe_download_filename(name, default: 'report.txt')
   end
 
   def schedule_rendering

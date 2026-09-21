@@ -37,4 +37,10 @@ class CacertValidatorTest < ActiveSupport::TestCase
     validatable.cacert = ''
     assert validatable.valid?
   end
+
+  test 'should fail when cacert exceeds size limit' do
+    validatable.cacert = sample_cacert + ('A' * (Foreman::UploadSecurity::MAX_CACERT_BYTES + 1))
+    refute validatable.valid?
+    assert validatable.errors[:cacert].any? { |m| m.include?('too large') }
+  end
 end
