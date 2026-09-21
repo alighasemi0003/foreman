@@ -9,7 +9,7 @@ class Setting < ApplicationRecord
   include PermissionName
 
   TYPES = %w{integer boolean hash array string}
-  NONZERO_ATTRS = %w{puppet_interval idle_timeout entries_per_page outofsync_interval}
+  NONZERO_ATTRS = %w{puppet_interval idle_timeout entries_per_page outofsync_interval account_lockout_attempts account_lockout_window account_lockout_duration}
   # constant BLANK_ATTRS is deprecated and all settings without custom validation allow blank values
   # if you wish to validate non-empty arrays, please add validation through the new setting DSL
   BLANK_ATTRS = %w{}

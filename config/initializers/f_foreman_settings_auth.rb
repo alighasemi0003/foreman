@@ -27,6 +27,21 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Foreman will block user logins from an IP address after this number of failed login attempts for 5 minutes. Set to 0 to disable bruteforce protection"),
       default: 30,
       full_name: N_('Failed login attempts limit'))
+    setting('account_lockout_attempts',
+      type: :integer,
+      description: N_("Number of consecutive failed password attempts against a local (internal) user account within the lockout window before the account is temporarily locked. Does not apply to LDAP or external authentication providers."),
+      default: 5,
+      full_name: N_('Account lockout attempts'))
+    setting('account_lockout_window',
+      type: :integer,
+      description: N_("Time window in minutes during which failed password attempts against a local user account are counted toward account lockout."),
+      default: 15,
+      full_name: N_('Account lockout window (minutes)'))
+    setting('account_lockout_duration',
+      type: :integer,
+      description: N_("How long in minutes a local user account remains locked after reaching the failed password attempt threshold. The account unlocks automatically when this period expires."),
+      default: 30,
+      full_name: N_('Account lockout duration (minutes)'))
     setting('restrict_registered_smart_proxies',
       type: :boolean,
       description: N_('Only known Smart Proxies may access features that use Smart Proxy authentication'),
