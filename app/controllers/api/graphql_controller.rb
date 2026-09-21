@@ -7,7 +7,7 @@ module Api
     include Foreman::Controller::ApiCsrfProtection
     include Foreman::Controller::BruteforceProtection
 
-    rescue_from Exception, with: :generic_exception if Rails.env.production?
+    rescue_from Exception, with: :handle_uncaught_exception
 
     before_action :authenticate
     before_action :session_expiry, :update_activity_time
@@ -98,7 +98,12 @@ module Api
 
     def generic_exception(exception)
       Foreman::Logging.exception('Action failed', exception)
-      render_error
+      render_error(Foreman::ClientError.internal_server_error_message)
+    end
+
+    def handle_uncaught_exception(exception)
+      raise exception if Rails.application.config.consider_all_requests_local
+      generic_exception(exception)
     end
 
     def render_error(error = 'An error occurred.', options = {})

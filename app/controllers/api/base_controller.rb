@@ -19,14 +19,13 @@ module Api
 
     rescue_from StandardError do |error|
       Foreman::Logging.exception("Action failed", error)
-      render_error 'standard_error', :status => :internal_server_error, :locals => { :exception => error }
+      message = Foreman::ClientError.client_message(error)
+      render_error 'custom_error', :status => :internal_server_error, :locals => { :message => message }
     end
 
     rescue_from NoMethodError do |error|
       Foreman::Logging.exception("Action failed", error)
-      message = _("Internal Server Error: the server was unable to finish the request. " \
-        "This may be caused by unavailability of some required service, incorrect API call or a server-side bug. " \
-        "There may be more information in the server's logs.")
+      message = Foreman::ClientError.internal_server_error_message
       render_error 'custom_error', :status => :internal_server_error, :locals => { :message => message }
     end
 
@@ -191,7 +190,7 @@ module Api
 
     def render_exception(exception, render_options = {})
       Foreman::Logging.exception(exception.to_s, exception)
-      render_message(exception.to_s, render_options)
+      render_message(Foreman::ClientError.client_message(exception), render_options)
     end
 
     def log_resource_errors(resource)

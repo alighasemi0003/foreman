@@ -6,12 +6,18 @@ class ForemanGraphqlSchema < GraphQL::Schema
   query(Types::Query)
   mutation(Types::Mutation)
 
-  if Rails.env.production?
-    rescue_from ActiveRecord::RecordInvalid, &:message
-    rescue_from ActiveRecord::Rollback, &:message
-    rescue_from StandardError, &:message
-    rescue_from ActiveRecord::RecordNotUnique, &:message
-    rescue_from ActiveRecord::RecordNotFound, &:message
+  # Always sanitize unexpected errors for clients; log full detail server-side.
+  # RecordInvalid / RecordNotFound messages are intentional client-facing feedback.
+  rescue_from ActiveRecord::RecordInvalid, &:message
+  rescue_from ActiveRecord::Rollback, &:message
+  rescue_from ActiveRecord::RecordNotFound, &:message
+  rescue_from ActiveRecord::RecordNotUnique do |error|
+    Foreman::Logging.exception("GraphQL RecordNotUnique", error)
+    raise GraphQL::ExecutionError, Foreman::ClientError.internal_server_error_message
+  end
+  rescue_from StandardError do |error|
+    Foreman::Logging.exception("GraphQL error", error)
+    raise GraphQL::ExecutionError, Foreman::ClientError.client_message(error)
   end
 
   def self.id_from_object(object, type_definition, query_ctx)

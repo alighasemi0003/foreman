@@ -5,7 +5,8 @@ class ApplicationController < ActionController::Base
   include Foreman::Controller::Authorize
 
   protect_from_forgery with: :exception # See ActionController::RequestForgeryProtection for details
-  rescue_from Exception, :with => :generic_exception if Rails.env.production?
+  # Always register; re-raise when requests are treated as local (dev/test default).
+  rescue_from Exception, :with => :handle_uncaught_exception
   rescue_from ScopedSearch::QueryNotSupported, :with => :invalid_search_query
   rescue_from ActiveRecord::RecordNotFound, :with => :not_found
   rescue_from ProxyAPI::ProxyException, :with => :smart_proxy_exception
@@ -142,11 +143,12 @@ class ApplicationController < ActionController::Base
 
   def smart_proxy_exception(exception = nil)
     Foreman::Logging.exception("ProxyAPI operation FAILED", exception)
+    safe_msg = Foreman::ClientError.client_message(exception)
     if request.headers.include? 'HTTP_REFERER'
-      process_error(:redirect => :back, :error_msg => exception.message)
+      process_error(:redirect => :back, :error_msg => safe_msg)
     else
-      process_error(:render => { :plain => exception.message },
-        :error_msg => exception.message)
+      process_error(:render => { :plain => safe_msg },
+                    :error_msg => safe_msg)
     end
   end
 
@@ -328,7 +330,7 @@ class ApplicationController < ActionController::Base
     origin = exception.original_exception if exception.present? && exception.respond_to?(:original_exception)
     Foreman::Logging.exception("Failed to #{action}", exception)
     Foreman::Logging.exception("Originally caused by", origin) if origin
-    message = (origin || exception).message
+    message = Foreman::ClientError.client_message(origin || exception)
 
     render :partial => "common/ajax_error", :status => :internal_server_error, :locals => { :message => message }
   end
@@ -341,11 +343,20 @@ class ApplicationController < ActionController::Base
     if exception.try(:cause).is_a?(ActiveRecord::SubclassNotFound)
       sti_clean_up(exception.cause)
     else
-      ex_message = exception.message
-      Foreman::Logging.exception(ex_message, exception)
-      full_request_id = request.request_id
-      render :template => "common/500", :layout => !request.xhr?, :status => :internal_server_error, :locals => { exception_message: ex_message, request_id: full_request_id.split('-').first, full_request_id: full_request_id }
+      Foreman::Logging.exception(exception.message, exception)
+      full_request_id = request.request_id.to_s
+      render :template => "common/500", :layout => !request.xhr?, :status => :internal_server_error,
+        :locals => {
+          :exception_message => Foreman::ClientError.internal_server_error_message,
+          :request_id => full_request_id.split('-').first.presence || 'unknown',
+          :full_request_id => full_request_id.presence || 'unknown',
+        }
     end
+  end
+
+  def handle_uncaught_exception(exception)
+    raise exception if Rails.application.config.consider_all_requests_local
+    generic_exception(exception)
   end
 
   def check_empty_taxonomy

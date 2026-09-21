@@ -1,3 +1,4 @@
 node :message do
-  locals[:exception].message
+  # Prefer sanitized message; fall back for callers that still pass :exception
+  locals[:message].presence || Foreman::ClientError.client_message(locals[:exception])
 end

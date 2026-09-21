@@ -41,7 +41,9 @@ module Api
       end
 
       def handle_proxy_error(exception)
-        render :status => :internal_server_error, :json => { error: exception.message }
+        Foreman::Logging.exception("Autosign proxy operation failed", exception)
+        message = Foreman::ClientError.client_message(exception)
+        render :status => :internal_server_error, :json => { error: message }
       end
     end
   end
