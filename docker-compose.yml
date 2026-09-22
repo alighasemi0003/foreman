@@ -20,14 +20,19 @@ services:
       - db:/var/lib/postgresql/data
 
   app: &app_base
-    image: quay.io/foreman/foreman:develop
-    command: bundle exec bin/rails server -b 0.0.0.0
+    # Local verification image built from this branch (not an official release tag).
+    image: foreman-local:security-hardening-5.0
+    command: bash -lc 'rm -f tmp/pids/server.pid; exec bundle exec bin/rails server -b 0.0.0.0'
     build:
       context: .
+      dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgres://foreman:foreman@db/foreman?pool=5
       - RAILS_MAX_THREADS=5
       - RAILS_ENV=production
+      # Local compose serves HTTP on :3000 — do not enforce force_ssl here.
+      # Production deployments must omit this (defaults to HTTPS) or set FOREMAN_REQUIRE_SSL=true.
+      - FOREMAN_REQUIRE_SSL=false
       - FOREMAN_FQDN=foreman.example.com
       - FOREMAN_DOMAIN=example.com
       - FOREMAN_RAILS_CACHE_STORE_TYPE=redis

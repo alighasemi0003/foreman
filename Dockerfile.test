@@ -1,0 +1,23 @@
+# Test-only image aligned with project Dockerfile base (CentOS Stream 9 + Ruby + Node 22).
+# Not for production. Use with docker-compose.test.yml under an isolated compose project.
+FROM quay.io/centos/centos:stream9
+
+ARG NODEJS_VERSION="22"
+
+RUN dnf upgrade -y && \
+    dnf module enable nodejs:${NODEJS_VERSION} -y && \
+    dnf install -y gcc-c++ make git ruby ruby-devel rubygem-bundler npm \
+      postgresql-devel openssl-devel libxml2-devel libffi-devel libcurl-devel \
+      zlib-devel readline-devel libcap-devel shared-mime-info redhat-rpm-config \
+      tar which hostname && \
+    dnf clean all
+
+ENV RAILS_ENV=test \
+    BUNDLE_PATH=/bundle \
+    BUNDLE_WITHOUT="console:development:journald:libvirt:vmware:openstack:ec2:openid:facter:telemetry" \
+    BUNDLE_JOBS=4 \
+    BUNDLE_RETRY=3 \
+    DATABASE_CLEANER_ALLOW_REMOTE_DATABASE_URL=true
+
+WORKDIR /app
+CMD ["sleep", "infinity"]

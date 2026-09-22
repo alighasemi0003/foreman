@@ -1,0 +1,39 @@
+# Ephemeral compose for Foreman 5.0 security verification (not production).
+# Use an isolated project name, e.g.:
+#   docker compose -p foreman50-test -f docker-compose.test.yml up -d
+services:
+  postgres:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: foreman50_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    working_dir: /app
+    volumes:
+      - .:/app
+      - foreman50_test_bundle:/bundle
+      - foreman50_test_node_modules:/app/node_modules
+    environment:
+      RAILS_ENV: test
+      DATABASE_URL: postgresql://postgres:password@postgres/foreman50_test
+      DATABASE_CLEANER_ALLOW_REMOTE_DATABASE_URL: "true"
+      BUNDLE_PATH: /bundle
+      BUNDLE_WITHOUT: "console:development:journald:libvirt:vmware:openstack:ec2:openid:facter:telemetry"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sleep infinity
+
+volumes:
+  foreman50_test_bundle:
+  foreman50_test_node_modules:
