@@ -20,6 +20,22 @@
 # so only change this if you know what you're doing.
 :hsts_enabled: true
 
+# Interactive login CAPTCHA (Cloudflare Turnstile). Disabled by default.
+# Enable only when you have Cloudflare Turnstile site + secret keys.
+# Enabling causes the login browser and Foreman server to communicate with
+# Cloudflare (https://challenges.cloudflare.com). Prefer ENV variables:
+#   FOREMAN_CAPTCHA_ENABLED=true
+#   FOREMAN_CAPTCHA_PROVIDER=turnstile
+#   FOREMAN_TURNSTILE_SITE_KEY=<site-key>
+#   FOREMAN_TURNSTILE_SECRET_KEY=<secret-key>
+# Never put the secret key in frontend code or commit real keys to Git.
+# :captcha:
+#   :enabled: false
+#   :provider: turnstile
+#   :turnstile:
+#     :site_key: ''
+#     :secret_key: ''
+
 # Local administrative settings for application domain, fqdn, foreman URL,
 # administrator email address etc. If you don't have a Puppet provisioning
 # system you may want to change to setup your project on your local machine.

@@ -19,6 +19,20 @@
   connect_src = ["'self'", "wss:"]
   connect_src << "ws:" unless SETTINGS[:require_ssl]
 
+  script_src = ["'unsafe-eval'", "'unsafe-inline'", "'self'"]
+  frame_src = ["'self'"]
+  child_src = ["'self'"]
+
+  # Cloudflare Turnstile challenge widget (login CAPTCHA only when enabled).
+  # Single fixed origin — no wildcards. Disabled CAPTCHA keeps CSP unchanged.
+  if SETTINGS.dig(:captcha, :enabled)
+    turnstile = 'https://challenges.cloudflare.com'
+    script_src << turnstile
+    frame_src << turnstile
+    child_src << turnstile
+    connect_src << turnstile
+  end
+
   # Enforcing CSP. 'unsafe-inline' / 'unsafe-eval' remain for legacy ERB + webpack/React
   # until nonce/hash migration; tracked as Remaining Risk (not removed here).
   config.csp = {
@@ -27,13 +41,13 @@
     :object_src => ["'none'"],
     :frame_ancestors => ["'self'"],
     :form_action => ["'self'"],
-    :frame_src => ["'self'"],
-    :child_src => ["'self'"],
+    :frame_src => frame_src,
+    :child_src => child_src,
     :connect_src => connect_src,
     :font_src => ["'self'", "data:"],
     :img_src => ["'self'", "data:"],
     :style_src => ["'unsafe-inline'", "'self'"],
-    :script_src => ["'unsafe-eval'", "'unsafe-inline'", "'self'"],
+    :script_src => script_src,
   }
 end
 

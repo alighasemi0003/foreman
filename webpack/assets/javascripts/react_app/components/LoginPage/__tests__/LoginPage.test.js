@@ -17,7 +17,8 @@ const renderLoginPage = (overrides = {}) => {
   );
 };
 
-const getAlertCloseButton = () => screen.queryByRole('button', { name: /^Close/i });
+const getAlertCloseButton = () =>
+  screen.queryByRole('button', { name: /^Close/i });
 
 describe('LoginPage', () => {
   it('renders login page', () => {
@@ -58,5 +59,42 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByPlaceholderText('Password'), 'secret');
 
     expect(submitButton).toBeEnabled();
+  });
+
+  it('does not render Turnstile widget when captcha disabled', () => {
+    renderLoginPage({ captcha: { enabled: false } });
+    expect(
+      document.querySelector('[data-ouia-component-id="login-captcha"]')
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('input[name="login[captcha_response]"]')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders Turnstile container and site key when captcha enabled', () => {
+    const renderMock = jest.fn(() => 'widget-1');
+    window.turnstile = {
+      render: renderMock,
+      reset: jest.fn(),
+    };
+    renderLoginPage({
+      captcha: {
+        enabled: true,
+        provider: 'turnstile',
+        siteKey: 'public-site-key-only',
+      },
+    });
+    expect(
+      document.querySelector('[data-ouia-component-id="login-captcha"]')
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('input[name="login[captcha_response]"]')
+    ).toBeInTheDocument();
+    expect(renderMock).toHaveBeenCalled();
+    expect(renderMock.mock.calls[0][1].sitekey).toBe('public-site-key-only');
+    // Secret must never appear in LoginPage DOM / bootstrap HTML.
+    expect(document.body.innerHTML).not.toMatch(/secret[_-]?key/i);
+    expect(document.body.innerHTML).not.toContain('server-secret');
+    delete window.turnstile;
   });
 });

@@ -253,8 +253,13 @@ class UsersController < ApplicationController
       backup_session_content { reset_session }
       intercept = SSO::FormIntercept.new(self)
       if intercept.available? && intercept.authenticated?
+        # REMOTE_USER / form intercept — no password form CAPTCHA.
         user = intercept.current_user
       else
+        # Interactive Local/LDAP password login: CAPTCHA before credentials.
+        unless captcha_allows_password_login?
+          return
+        end
         user = User.try_to_login(attempted_login, params[:login]['password'])
       end
       if user.nil?
@@ -424,5 +429,30 @@ class UsersController < ApplicationController
     raise exception unless request.post? && action_name == 'login'
     inline_warning _("CSRF protection token expired, please log in again")
     redirect_to login_users_path
+  end
+
+  # Password-form CAPTCHA gate (Turnstile). Fail-closed when enabled.
+  # Does not run password verification / account lockout on failure.
+  # Skipped for REMOTE_USER FormIntercept and all non-password auth paths.
+  def captcha_allows_password_login?
+    return true unless Foreman::Captcha.enabled?
+
+    token = params.dig(:login, :captcha_response).presence ||
+      params['cf-turnstile-response'].presence
+    result = Foreman::Captcha.verify(token, remote_ip: request.remote_ip)
+    return true if result.success?
+
+    Foreman::SecurityEvent.log(
+      event: 'CAPTCHA_FAILED',
+      status: 'DENIED',
+      level: :warn,
+      actor: nil,
+      ip: request.remote_ip,
+      details: result.message
+    )
+    # Same user-visible message regardless of username existence / provider code.
+    inline_error _("CAPTCHA verification failed. Please try again.")
+    redirect_to login_users_path
+    false
   end
 end
