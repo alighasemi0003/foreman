@@ -12,7 +12,8 @@ services:
       - '5432'
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 5432 || exit 1"]
+      # postgres image has pg_isready; it does not ship netcat (nc).
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DATABASE:-$${POSTGRES_DB:-postgres}} -h 127.0.0.1 || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 3
@@ -58,17 +59,24 @@ services:
     command: bundle exec sidekiq -r ./extras/dynflow-sidekiq.rb -c 1 -q dynflow_orchestrator
     hostname: orchestrator.example.com
     ports: []
+    # Sidekiq does not listen on :3000; do not inherit the app TCP healthcheck.
+    healthcheck:
+      disable: true
 
   worker:
     <<: *app_base
     command: bundle exec sidekiq -r ./extras/dynflow-sidekiq.rb -c 15 -q default,1 -q remote_execution,1
     ports: []
+    healthcheck:
+      disable: true
 
   redis-cache:
     image: redis
+    restart: always
 
   redis-tasks:
     image: redis
+    restart: always
     command: redis-server --appendonly yes
     volumes:
       - redis-persistent:/data
