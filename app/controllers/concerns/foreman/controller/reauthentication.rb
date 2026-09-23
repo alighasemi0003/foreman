@@ -36,14 +36,10 @@ module Foreman
       end
 
       def ensure_meta_settings_reauthenticated!(setting_name)
-        if Foreman::Reauthentication.meta_setting?(setting_name)
-          return ensure_reauthenticated!(Foreman::Reauthentication::META_ACTION_KEY)
-        end
-        if Foreman::Reauthentication.always_reauth_setting?(setting_name)
-          return ensure_reauthenticated!(Foreman::Reauthentication::OAUTH_CREDENTIALS_ACTION_KEY)
-        end
+        action_key = Foreman::Reauthentication.action_key_for_setting(setting_name)
+        return true if action_key.nil?
 
-        true
+        ensure_reauthenticated!(action_key)
       end
 
       def render_reauthentication_required(action_key)

@@ -28,6 +28,8 @@ module Mutations
         definition = Foreman.settings.find(name)
         validate_object(definition)
 
+        ensure_sensitive_setting_reauthenticated!(definition.name)
+
         record = Foreman.settings.set_user_value(definition.name, params[:value])
         save_object(definition, record)
       end
@@ -53,6 +55,38 @@ module Mutations
 
         raise GraphQL::ExecutionError.new(
           _('Unauthorized. You do not have the required permission %s.') % 'edit_settings'
+        )
+      end
+
+      # Parity with Api::V2::SettingsController#ensure_meta_settings_reauthenticated!
+      # Authorization already ran; machine/API sessions are excluded by
+      # Foreman::Reauthentication.interactive_session?.
+      def ensure_sensitive_setting_reauthenticated!(setting_name)
+        action_key = Foreman::Reauthentication.action_key_for_setting(setting_name)
+        return if action_key.nil?
+
+        session = context[:session] || {}
+        return unless Foreman::Reauthentication.required_for?(action_key, session: session)
+
+        actor = Foreman::Reauthentication.real_actor(session)
+        Foreman::SecurityEvent.log(
+          event: 'REAUTH_REQUIRED',
+          status: 'DENIED',
+          level: :warn,
+          actor: actor&.login,
+          ip: context[:request_ip],
+          target: action_key,
+          details: "setting=#{setting_name}"
+        )
+
+        raise GraphQL::ExecutionError.new(
+          _('Re-authentication required to perform this action.'),
+          extensions: {
+            'code' => 'REAUTHENTICATION_REQUIRED',
+            'reauthentication_required' => true,
+            'action' => action_key,
+            'reauthentication_supported' => Foreman::Reauthentication.supported_for?(actor),
+          }
         )
       end
     end

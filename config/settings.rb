@@ -1,5 +1,6 @@
 require_relative '../app/services/foreman/version'
 require_relative '../app/services/foreman/env_settings_loader'
+require_relative '../app/services/foreman/ssl_defaults'
 
 settings_file = File.join(__dir__, Rails.env.test? ? 'settings.yaml.test' : 'settings.yaml')
 
@@ -9,6 +10,12 @@ SETTINGS[:version] = Foreman::Version.new
 
 # Load settings from env variables
 SETTINGS.deep_merge!(Foreman::EnvSettingsLoader.new.to_h)
+
+# Production mandates HTTPS for all routes (Rails force_ssl + Secure cookies).
+# Opt-out for lab/HTTP-only Production-like deploys: FOREMAN_REQUIRE_SSL=false
+# Development/Test keep settings.yaml / settings.yaml.test (typically false).
+# Local Docker compose sets FOREMAN_REQUIRE_SSL=false for HTTP :3000.
+Foreman::SslDefaults.apply!(SETTINGS, env: ENV, rails_env: Rails.env)
 
 # foreman-documentation builds different flavors for Debian and Enterprise
 # Linux. It also builds for Katello, but we can't detect that here so the key

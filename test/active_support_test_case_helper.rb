@@ -117,6 +117,9 @@ class ActiveSupport::TestCase
     user = User.find_by_login("one")
     @request.session[:user] = user.id
     @request.session[:expires_at] = 5.minutes.from_now.to_i
+    # Interactive session that already completed step-up (matches successful login).
+    @request.session[Foreman::Reauthentication::SESSION_AT] = Time.now.utc.to_i
+    @request.session[Foreman::Reauthentication::SESSION_ACTOR] = user.id
     user.roles = [Role.default, Role.find_by_name('Viewer')]
     user.save!
   end

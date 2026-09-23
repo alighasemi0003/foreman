@@ -149,6 +149,14 @@ module Foreman
       ALWAYS_REAUTH_SETTING_NAMES.include?(name.to_s)
     end
 
+    # Action key for a setting name that requires step-up, or nil if not gated.
+    def action_key_for_setting(name)
+      return META_ACTION_KEY if meta_setting?(name)
+      return OAUTH_CREDENTIALS_ACTION_KEY if always_reauth_setting?(name)
+
+      nil
+    end
+
     def admin_transition?(user, params)
       return false unless user
       return false unless params.key?(:admin) || params.key?('admin')

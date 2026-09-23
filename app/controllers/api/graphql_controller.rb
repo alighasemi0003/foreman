@@ -68,6 +68,9 @@ module Api
         current_user: User.current,
         request_id: request.uuid,
         request_ip: request.remote_ip,
+        # Interactive-session reauth gates need the real Rails session
+        # (session[:user], api_authenticated_session, reauthenticated_at).
+        session: session,
       }
     end
 
