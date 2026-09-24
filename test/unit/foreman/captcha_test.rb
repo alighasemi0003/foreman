@@ -1,26 +1,19 @@
 # frozen_string_literal: true
 
 require 'test_helper'
-require 'json'
 
 class ForemanCaptchaTest < ActiveSupport::TestCase
   setup do
     @prev_setting = Setting[:captcha_enabled]
-    @prev_settings = SETTINGS[:captcha]
+    @prev_ttl = SETTINGS.dig(:captcha, :ttl_seconds)
     Setting[:captcha_enabled] = false
     SETTINGS[:captcha] = nil
+    @session = {}
   end
 
   teardown do
     Setting[:captcha_enabled] = @prev_setting
-    SETTINGS[:captcha] = @prev_settings
-  end
-
-  def enable_turnstile_keys!(site: 'test-site-key', secret: 'test-secret-key')
-    SETTINGS[:captcha] = {
-      provider: 'turnstile',
-      turnstile: { site_key: site, secret_key: secret },
-    }
+    SETTINGS[:captcha] = @prev_ttl.nil? ? nil : { ttl_seconds: @prev_ttl }
   end
 
   test 'captcha_enabled setting defaults to false' do
@@ -30,134 +23,100 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
     assert_equal 'auth', definition.category
   end
 
-  test 'disabled setting verify succeeds without HTTP' do
+  test 'disabled captcha verify succeeds without session challenge' do
     Setting[:captcha_enabled] = false
-    enable_turnstile_keys!
-    Net::HTTP.any_instance.expects(:request).never
-    result = Foreman::Captcha.verify('anything')
+    result = Foreman::Captcha.verify('anything', session: @session)
     assert result.success?
   end
 
   test 'enabled? follows Setting without restart' do
-    enable_turnstile_keys!
     Setting[:captcha_enabled] = false
     refute Foreman::Captcha.enabled?
-    assert_equal false, Foreman::Captcha.frontend_config[:enabled]
+    assert_equal false, Foreman::Captcha.frontend_config(@session)[:enabled]
 
     Setting[:captcha_enabled] = true
     assert Foreman::Captcha.enabled?
-    cfg = Foreman::Captcha.frontend_config
+    cfg = Foreman::Captcha.frontend_config(@session)
     assert_equal true, cfg[:enabled]
-    assert_equal 'test-site-key', cfg[:siteKey]
+    assert_equal 'local', cfg[:provider]
+    assert cfg[:question].present?
+    refute cfg.key?(:answer)
+    refute cfg.key?(:digest)
 
     Setting[:captcha_enabled] = false
     refute Foreman::Captcha.enabled?
-    assert_equal false, Foreman::Captcha.frontend_config[:enabled]
   end
 
-  test 'frontend_config never includes secret' do
+  test 'frontend_config never exposes answer' do
     Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    cfg = Foreman::Captcha.frontend_config
-    assert_equal true, cfg[:enabled]
-    assert_equal 'turnstile', cfg[:provider]
-    assert_equal 'test-site-key', cfg[:siteKey]
-    refute cfg.key?(:secretKey)
-    refute cfg.key?(:secret_key)
-    refute cfg.values.any? { |v| v.to_s.include?('test-secret-key') }
+    SecureRandom.stubs(:random_number).returns(12, 34)
+    cfg = Foreman::Captcha.frontend_config(@session)
+    assert_match(/12.*\+.*34|What is/, cfg[:question])
+    refute_includes cfg[:question], '46' if cfg[:question] !~ /\+/
+    stored = @session[Foreman::Captcha::Local::SESSION_KEY]
+    assert stored['digest'].present?
+    refute_equal '46', stored['digest']
+    refute cfg.values.any? { |v| v.to_s == '46' }
   end
 
-  test 'enabled with blank token fails closed' do
+  test 'issue uses SecureRandom not Kernel rand' do
     Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    Net::HTTP.any_instance.expects(:request).never
-    result = Foreman::Captcha.verify('  ')
-    assert result.failed?
-    assert_equal :failed, result.status
+    Kernel.expects(:rand).never
+    SecureRandom.expects(:random_number).with(10..40).returns(11)
+    SecureRandom.expects(:random_number).with(10..40).returns(12)
+    Foreman::Captcha::Local.issue!(@session)
+    assert_equal Foreman::Captcha::Local.digest('23'),
+      @session[Foreman::Captcha::Local::SESSION_KEY]['digest']
   end
 
-  test 'enabled with missing site key fails closed' do
+  test 'valid answer succeeds and consumes challenge' do
     Setting[:captcha_enabled] = true
-    SETTINGS[:captcha] = {
-      provider: 'turnstile',
-      turnstile: { site_key: '', secret_key: 'test-secret-key' },
-    }
-    Net::HTTP.any_instance.expects(:request).never
-    result = Foreman::Captcha.verify('token')
-    assert_equal :configuration_error, result.status
-    assert Foreman::Captcha.frontend_config[:configurationError]
-  end
-
-  test 'enabled with missing secret key fails closed' do
-    Setting[:captcha_enabled] = true
-    SETTINGS[:captcha] = {
-      provider: 'turnstile',
-      turnstile: { site_key: 'test-site-key', secret_key: '' },
-    }
-    Net::HTTP.any_instance.expects(:request).never
-    result = Foreman::Captcha.verify('token')
-    assert_equal :configuration_error, result.status
-  end
-
-  test 'valid turnstile response succeeds' do
-    Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    http_response = mock('response')
-    http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(true)
-    http_response.stubs(:body).returns({ 'success' => true }.to_json)
-    Net::HTTP.any_instance.expects(:request).returns(http_response)
-
-    result = Foreman::Captcha.verify('valid-token', remote_ip: '203.0.113.9')
+    SecureRandom.stubs(:random_number).returns(10, 15)
+    Foreman::Captcha::Local.issue!(@session)
+    result = Foreman::Captcha.verify('25', session: @session)
     assert result.success?
+    assert_nil @session[Foreman::Captcha::Local::SESSION_KEY]
   end
 
-  test 'invalid turnstile response fails' do
+  test 'wrong answer fails and consumes challenge' do
     Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    http_response = mock('response')
-    http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(true)
-    http_response.stubs(:body).returns({ 'success' => false, 'error-codes' => ['invalid-input-response'] }.to_json)
-    Net::HTTP.any_instance.expects(:request).returns(http_response)
-
-    result = Foreman::Captcha.verify('bad-token')
+    SecureRandom.stubs(:random_number).returns(10, 15)
+    Foreman::Captcha::Local.issue!(@session)
+    result = Foreman::Captcha.verify('99', session: @session)
     assert_equal :failed, result.status
+    assert_nil @session[Foreman::Captcha::Local::SESSION_KEY]
   end
 
-  test 'provider HTTP error fails closed' do
+  test 'missing answer fails' do
     Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    http_response = mock('response')
-    http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(false)
-    http_response.stubs(:code).returns('500')
-    Net::HTTP.any_instance.expects(:request).returns(http_response)
-
-    result = Foreman::Captcha.verify('token')
-    assert_equal :provider_error, result.status
+    SecureRandom.stubs(:random_number).returns(1, 2)
+    Foreman::Captcha::Local.issue!(@session)
+    result = Foreman::Captcha.verify('  ', session: @session)
+    assert result.failed?
   end
 
-  test 'timeout fails closed' do
+  test 'expired challenge fails' do
     Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    Net::HTTP.any_instance.expects(:request).raises(Net::ReadTimeout)
-
-    result = Foreman::Captcha.verify('token')
-    assert_equal :provider_error, result.status
+    SETTINGS[:captcha] = { ttl_seconds: 60 }
+    SecureRandom.stubs(:random_number).returns(3, 4)
+    Foreman::Captcha::Local.issue!(@session)
+    @session[Foreman::Captcha::Local::SESSION_KEY]['created_at'] = 10.minutes.ago.to_i
+    result = Foreman::Captcha.verify('7', session: @session)
+    assert_equal :failed, result.status
+    assert_equal 'captcha_expired', result.message
   end
 
-  test 'malformed JSON fails closed' do
+  test 'reused challenge fails' do
     Setting[:captcha_enabled] = true
-    enable_turnstile_keys!
-    http_response = mock('response')
-    http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(true)
-    http_response.stubs(:body).returns('not-json')
-    Net::HTTP.any_instance.expects(:request).returns(http_response)
-
-    result = Foreman::Captcha.verify('token')
-    assert_equal :provider_error, result.status
+    SecureRandom.stubs(:random_number).returns(8, 9)
+    Foreman::Captcha::Local.issue!(@session)
+    assert Foreman::Captcha.verify('17', session: @session).success?
+    reused = Foreman::Captcha.verify('17', session: @session)
+    assert reused.failed?
+    assert_equal 'captcha_missing', reused.message
   end
 
-  test 'siteverify URL is fixed Cloudflare endpoint' do
-    assert_equal 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-      Foreman::Captcha::TURNSTILE_SITEVERIFY_URL
+  test 'provider is local' do
+    assert_equal 'local', Foreman::Captcha.provider
   end
 end

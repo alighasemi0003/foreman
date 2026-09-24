@@ -54,10 +54,8 @@ module Foreman
         'FOREMAN_RAILS_CACHE_STORE_OPTIONS_CONNECT_TIMEOUT' => [:float, :rails_cache_store, :options, :connect_timeout],
         'FOREMAN_RAILS_CACHE_STORE_OPTIONS_READ_TIMEOUT' => [:float, :rails_cache_store, :options, :read_timeout],
         'FOREMAN_RAILS_CACHE_STORE_OPTIONS_WRITE_TIMEOUT' => [:float, :rails_cache_store, :options, :write_timeout],
-        # Turnstile keys (deployment secrets). Enable/disable is Setting[:captcha_enabled].
-        'FOREMAN_CAPTCHA_PROVIDER' => [:string, :captcha, :provider],
-        'FOREMAN_TURNSTILE_SITE_KEY' => [:string, :captcha, :turnstile, :site_key],
-        'FOREMAN_TURNSTILE_SECRET_KEY' => [:string, :captcha, :turnstile, :secret_key],
+        # Optional CAPTCHA challenge TTL in seconds (local offline provider). Default 300.
+        'FOREMAN_CAPTCHA_TTL_SECONDS' => [:integer, :captcha, :ttl_seconds],
       }.merge(logger_settings_map)
     end
 

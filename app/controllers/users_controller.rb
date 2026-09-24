@@ -7,7 +7,7 @@ class UsersController < ApplicationController
 
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
-  skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout]
+  skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout, :captcha_challenge]
   skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation, :reauthenticate]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
@@ -250,16 +250,18 @@ class UsersController < ApplicationController
 
     if request.post?
       attempted_login = params[:login].try(:[], 'login')
-      backup_session_content { reset_session }
       intercept = SSO::FormIntercept.new(self)
       if intercept.available? && intercept.authenticated?
         # REMOTE_USER / form intercept — no password form CAPTCHA.
+        backup_session_content { reset_session }
         user = intercept.current_user
       else
         # Interactive Local/LDAP password login: CAPTCHA before credentials.
+        # Must run before reset_session so the session-stored challenge is available.
         unless captcha_allows_password_login?
           return
         end
+        backup_session_content { reset_session }
         user = User.try_to_login(attempted_login, params[:login]['password'])
       end
       if user.nil?
@@ -363,6 +365,20 @@ class UsersController < ApplicationController
     render :json => {:message => _("Email was sent successfully")}, :status => :ok
   end
 
+  # Offline local CAPTCHA challenge refresh (JSON). No login required.
+  def captcha_challenge
+    unless Foreman::Captcha.enabled?
+      return render json: { enabled: false }, status: :ok
+    end
+
+    challenge = Foreman::Captcha::Local.issue!(session)
+    render json: {
+      enabled: true,
+      provider: Foreman::Captcha.provider,
+      question: challenge[:question],
+    }
+  end
+
   private
 
   def find_resource(permission = :view_users)
@@ -431,15 +447,14 @@ class UsersController < ApplicationController
     redirect_to login_users_path
   end
 
-  # Password-form CAPTCHA gate (Turnstile). Fail-closed when enabled.
+  # Password-form CAPTCHA gate (local offline challenge). Fail-closed when enabled.
   # Does not run password verification / account lockout on failure.
   # Skipped for REMOTE_USER FormIntercept and all non-password auth paths.
   def captcha_allows_password_login?
     return true unless Foreman::Captcha.enabled?
 
-    token = params.dig(:login, :captcha_response).presence ||
-      params['cf-turnstile-response'].presence
-    result = Foreman::Captcha.verify(token, remote_ip: request.remote_ip)
+    token = params.dig(:login, :captcha_response).presence
+    result = Foreman::Captcha.verify(token, session: session)
     return true if result.success?
 
     Foreman::SecurityEvent.log(

@@ -23,16 +23,6 @@
   frame_src = ["'self'"]
   child_src = ["'self'"]
 
-  # Cloudflare Turnstile origin is always allowed so Setting[:captcha_enabled]
-  # can be toggled from Administer → Settings without restarting Rails/CSP boot.
-  # Narrow fixed origin only — no wildcards. Widget/script load only when the
-  # login page enables CAPTCHA; keys remain deployment-managed.
-  turnstile = 'https://challenges.cloudflare.com'
-  script_src << turnstile
-  frame_src << turnstile
-  child_src << turnstile
-  connect_src << turnstile
-
   # Enforcing CSP. 'unsafe-inline' / 'unsafe-eval' remain for legacy ERB + webpack/React
   # until nonce/hash migration; tracked as Remaining Risk (not removed here).
   config.csp = {

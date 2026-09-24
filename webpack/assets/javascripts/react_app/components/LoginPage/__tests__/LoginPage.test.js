@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
@@ -61,7 +61,7 @@ describe('LoginPage', () => {
     expect(submitButton).toBeEnabled();
   });
 
-  it('does not render Turnstile widget when captcha disabled', () => {
+  it('does not render local CAPTCHA when captcha disabled', () => {
     renderLoginPage({ captcha: { enabled: false } });
     expect(
       document.querySelector('[data-ouia-component-id="login-captcha"]')
@@ -71,51 +71,59 @@ describe('LoginPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders Turnstile container and site key when captcha enabled', () => {
-    const renderMock = jest.fn(() => 'widget-1');
-    window.turnstile = {
-      render: renderMock,
-      reset: jest.fn(),
-    };
+  it('renders local CAPTCHA question and answer field when enabled', async () => {
     renderLoginPage({
       captcha: {
         enabled: true,
-        provider: 'turnstile',
-        siteKey: 'public-site-key-only',
+        provider: 'local',
+        question: 'What is 12 + 34?',
+        refreshPath: '/users/captcha_challenge',
       },
     });
     expect(
       document.querySelector('[data-ouia-component-id="login-captcha"]')
     ).toBeInTheDocument();
+    expect(screen.getByText('What is 12 + 34?')).toBeInTheDocument();
     expect(
       document.querySelector('input[name="login[captcha_response]"]')
     ).toBeInTheDocument();
-    expect(renderMock).toHaveBeenCalled();
-    expect(renderMock.mock.calls[0][1].sitekey).toBe('public-site-key-only');
-    // Secret must never appear in LoginPage DOM / bootstrap HTML.
-    expect(document.body.innerHTML).not.toMatch(/secret[_-]?key/i);
-    expect(document.body.innerHTML).not.toContain('server-secret');
-    delete window.turnstile;
+    expect(document.body.innerHTML).not.toMatch(/answer.?digest|login_captcha/i);
+
+    const submitButton = screen.getByRole('button', { name: 'Log In' });
+    await userEvent.type(screen.getByPlaceholderText('Username'), 'admin');
+    await userEvent.type(screen.getByPlaceholderText('Password'), 'secret');
+    expect(submitButton).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/CAPTCHA answer/i), '46');
+    expect(submitButton).toBeEnabled();
   });
 
-  it('shows configuration error and keeps submit disabled when enabled without site key', async () => {
+  it('refresh requests a new CAPTCHA challenge', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        enabled: true,
+        provider: 'local',
+        question: 'What is 5 + 6?',
+      }),
+    });
     renderLoginPage({
       captcha: {
         enabled: true,
-        provider: 'turnstile',
-        siteKey: null,
-        configurationError: true,
+        provider: 'local',
+        question: 'What is 1 + 2?',
+        refreshPath: '/users/captcha_challenge',
       },
     });
-    expect(
-      screen.getByText(/CAPTCHA is enabled but is not configured/i)
-    ).toBeInTheDocument();
-    expect(
-      document.querySelector('[data-ouia-component-id="login-captcha"]')
-    ).not.toBeInTheDocument();
-
-    await userEvent.type(screen.getByPlaceholderText('Username'), 'admin');
-    await userEvent.type(screen.getByPlaceholderText('Password'), 'secret');
-    expect(screen.getByRole('button', { name: 'Log In' })).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole('button', { name: /Refresh CAPTCHA/i })
+    );
+    await waitFor(() => {
+      expect(screen.getByText('What is 5 + 6?')).toBeInTheDocument();
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/users/captcha_challenge',
+      expect.objectContaining({ method: 'GET' })
+    );
+    delete global.fetch;
   });
 });

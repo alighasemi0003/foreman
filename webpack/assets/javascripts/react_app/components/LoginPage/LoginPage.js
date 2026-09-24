@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   LoginPage as PF5LoginPage,
@@ -16,32 +16,24 @@ import { translate as __ } from '../../common/I18n';
 import { adjustAlerts, defaultFormProps } from './helpers';
 import './LoginPage.scss';
 
-const TURNSTILE_SCRIPT =
-  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-
 const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
   const { modifiedAlerts, submitErrors } = adjustAlerts(alerts);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaLoadError, setCaptchaLoadError] = useState(false);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaQuestion, setCaptchaQuestion] = useState(
+    (captcha && captcha.question) || ''
+  );
+  const [captchaError, setCaptchaError] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoginDisabled, setIsLoginDisabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [alertArr, setAlertArr] = useState(modifiedAlerts);
-  const widgetIdRef = useRef(null);
-  const containerRef = useRef(null);
 
-  // Setting enabled server-side; widget needs a site key. Misconfiguration must
-  // not silently bypass the challenge (submit stays disabled).
-  const captchaRequested = !!(captcha && captcha.enabled);
-  const captchaConfigError =
-    captchaRequested &&
-    (!!captcha.configurationError || !captcha.siteKey);
-  const captchaEnabled = captchaRequested && !!captcha.siteKey && !captchaConfigError;
+  const captchaEnabled = !!(captcha && captcha.enabled);
   const captchaReady =
-    !captchaRequested ||
-    (captchaEnabled && !!captchaToken && !captchaLoadError && !captchaConfigError);
+    !captchaEnabled || (!!captchaAnswer.trim() && !!captchaQuestion && !captchaError);
 
   const updateSubmitDisabled = (user, pass, challengeOk) => {
     setIsLoginDisabled(!(user !== '' && pass !== '' && challengeOk));
@@ -52,120 +44,82 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
     setAlertArr(other);
   };
 
-  const resetCaptchaWidget = () => {
-    setCaptchaToken('');
-    if (
-      captchaEnabled &&
-      window.turnstile &&
-      widgetIdRef.current !== null
-    ) {
-      try {
-        window.turnstile.reset(widgetIdRef.current);
-      } catch (e) {
-        // ignore reset errors; server will fail closed without a fresh token
+  const refreshCaptcha = async () => {
+    if (!captchaEnabled) return;
+    setIsRefreshing(true);
+    setCaptchaError(false);
+    setCaptchaAnswer('');
+    try {
+      const path = (captcha && captcha.refreshPath) || '/users/captcha_challenge';
+      const response = await fetch(path, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error('refresh_failed');
       }
+      const data = await response.json();
+      if (!data.question) {
+        throw new Error('missing_question');
+      }
+      setCaptchaQuestion(data.question);
+      updateSubmitDisabled(username, password, false);
+    } catch (e) {
+      setCaptchaError(true);
+      setCaptchaQuestion('');
+      setIsLoginDisabled(true);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    if (captchaConfigError) {
-      setCaptchaLoadError(true);
-      setIsLoginDisabled(true);
-    }
-  }, [captchaConfigError]);
-
-  useEffect(() => {
-    if (!captchaEnabled) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const renderWidget = () => {
-      if (cancelled || !containerRef.current || !window.turnstile) {
-        return;
-      }
-      try {
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: captcha.siteKey,
-          callback: value => {
-            setCaptchaToken(value || '');
-            setCaptchaLoadError(false);
-            setIsLoginDisabled(!(username && password && value));
-          },
-          'expired-callback': () => {
-            setCaptchaToken('');
-            setIsLoginDisabled(true);
-          },
-          'error-callback': () => {
-            setCaptchaToken('');
-            setCaptchaLoadError(true);
-            setIsLoginDisabled(true);
-          },
-        });
-      } catch (e) {
-        setCaptchaLoadError(true);
-      }
-    };
-
-    // API already present (e.g. prior load or test stub) — render without reloading.
-    if (window.turnstile) {
-      renderWidget();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const existing = document.querySelector(
-      `script[src="${TURNSTILE_SCRIPT}"]`
-    );
-    if (existing) {
-      existing.addEventListener('load', renderWidget);
-      existing.addEventListener('error', () => {
-        if (!cancelled) setCaptchaLoadError(true);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const script = document.createElement('script');
-    script.src = TURNSTILE_SCRIPT;
-    script.async = true;
-    script.onload = () => renderWidget();
-    script.onerror = () => {
-      if (!cancelled) setCaptchaLoadError(true);
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once for challenge
-  }, [captchaEnabled, captcha && captcha.siteKey]);
-
-  // After a failed login (server re-render with error), reset challenge token.
+  // After a failed login (server re-render with error), clear answer so user
+  // must use the newly issued question from props / refresh.
   useEffect(() => {
     if (submitErrors.length > 0 && captchaEnabled) {
-      resetCaptchaWidget();
+      setCaptchaAnswer('');
+      if (captcha && captcha.question) {
+        setCaptchaQuestion(captcha.question);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (captcha && captcha.question) {
+      setCaptchaQuestion(captcha.question);
+    }
+  }, [captcha && captcha.question]);
+
   const handleUsernameChange = (_event, value) => {
     setUsername(value);
-    updateSubmitDisabled(value, password, captchaReady);
+    const ready =
+      !captchaEnabled ||
+      (!!captchaAnswer.trim() && !!captchaQuestion && !captchaError);
+    updateSubmitDisabled(value, password, ready);
   };
 
   const handlePasswordChange = (_event, value) => {
     setPassword(value);
-    updateSubmitDisabled(username, value, captchaReady);
+    const ready =
+      !captchaEnabled ||
+      (!!captchaAnswer.trim() && !!captchaQuestion && !captchaError);
+    updateSubmitDisabled(username, value, ready);
+  };
+
+  const handleCaptchaChange = (_event, value) => {
+    setCaptchaAnswer(value);
+    const ready =
+      !captchaEnabled ||
+      (!!value.trim() && !!captchaQuestion && !captchaError);
+    updateSubmitDisabled(username, password, ready);
   };
 
   const handleSubmit = event => {
-    if (captchaRequested && (!captchaToken || captchaLoadError || captchaConfigError)) {
+    if (captchaEnabled && (!captchaAnswer.trim() || !captchaQuestion || captchaError)) {
       event.preventDefault();
-      setCaptchaLoadError(true);
+      setCaptchaError(true);
       setIsLoginDisabled(true);
       return;
     }
@@ -174,14 +128,6 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
       setIsLoginDisabled(true);
     }, 10);
   };
-
-  const captchaErrorTitle = captchaConfigError
-    ? __(
-        'CAPTCHA is enabled but is not configured. Please contact your administrator.'
-      )
-    : __(
-        'CAPTCHA could not be loaded. Please retry or contact your administrator.'
-      );
 
   const loginForm = (
     <Form {...defaultFormProps.attributes}>
@@ -234,28 +180,44 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
           {...defaultFormProps.passwordField}
         />
       </FormGroup>
-      {(captchaEnabled || captchaConfigError) && (
-        <FormGroup fieldId="login-captcha">
-          {captchaEnabled && (
-            <>
-              <div
-                id="turnstile-container"
-                ref={containerRef}
-                data-ouia-component-id="login-captcha"
-              />
-              <input
-                type="hidden"
-                name="login[captcha_response]"
-                value={captchaToken}
-                readOnly
-              />
-            </>
-          )}
-          {(captchaLoadError || captchaConfigError) && (
+      {captchaEnabled && (
+        <FormGroup
+          isRequired
+          fieldId="login-captcha"
+          label={captchaQuestion || __('CAPTCHA challenge')}
+        >
+          <div data-ouia-component-id="login-captcha">
+            <TextInput
+              ouiaId="login-captcha-answer"
+              isRequired
+              type="text"
+              name="login[captcha_response]"
+              value={captchaAnswer}
+              autoComplete="off"
+              aria-label={__('CAPTCHA answer')}
+              placeholder={__('Answer')}
+              onChange={handleCaptchaChange}
+              isDisabled={captchaError && !captchaQuestion}
+            />
+            <Button
+              ouiaId="login-captcha-refresh"
+              variant="link"
+              type="button"
+              isInline
+              isDisabled={isRefreshing}
+              onClick={refreshCaptcha}
+              aria-label={__('Refresh CAPTCHA')}
+            >
+              {__('Refresh CAPTCHA')}
+            </Button>
+          </div>
+          {captchaError && (
             <Alert
-              ouiaId="login-captcha-load-error"
+              ouiaId="login-captcha-error"
               variant="danger"
-              title={captchaErrorTitle}
+              title={__(
+                'CAPTCHA could not be loaded. Please retry or contact your administrator.'
+              )}
               aria-live="polite"
               isInline
             />
@@ -307,8 +269,8 @@ LoginPage.propTypes = {
   captcha: PropTypes.shape({
     enabled: PropTypes.bool,
     provider: PropTypes.string,
-    siteKey: PropTypes.string,
-    configurationError: PropTypes.bool,
+    question: PropTypes.string,
+    refreshPath: PropTypes.string,
   }),
 };
 

@@ -29,7 +29,7 @@ Foreman::SettingManager.define(:foreman) do
       full_name: N_('Failed login attempts limit'))
     setting('captcha_enabled',
       type: :boolean,
-      description: N_("Require Cloudflare Turnstile verification for interactive password logins. Turnstile site and secret keys must be provided by deployment (FOREMAN_TURNSTILE_SITE_KEY / FOREMAN_TURNSTILE_SECRET_KEY)."),
+      description: N_("Require an offline CAPTCHA challenge for interactive password logins. The challenge is generated and verified entirely on the Foreman server (no external network)."),
       default: false,
       full_name: N_('Login CAPTCHA'))
     setting('account_lockout_attempts',

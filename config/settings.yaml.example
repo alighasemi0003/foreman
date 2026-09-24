@@ -20,20 +20,14 @@
 # so only change this if you know what you're doing.
 :hsts_enabled: true
 
-# Interactive login CAPTCHA (Cloudflare Turnstile).
+# Interactive login CAPTCHA (offline local provider).
 # Enable/disable at runtime via Administer → Settings → Authentication →
 # "Login CAPTCHA" (Setting captcha_enabled). Default is OFF; no restart needed.
-# Deploy site + secret keys via ENV (secret never goes in Settings UI / Git):
-#   FOREMAN_TURNSTILE_SITE_KEY=<site-key>
-#   FOREMAN_TURNSTILE_SECRET_KEY=<secret-key>
-# Optional: FOREMAN_CAPTCHA_PROVIDER=turnstile (only provider supported).
-# Enabling CAPTCHA causes the login browser and Foreman server to communicate
-# with Cloudflare (https://challenges.cloudflare.com).
+# Challenges are generated and verified on the Foreman server (session-backed).
+# Optional TTL override (seconds, default 300):
+#   FOREMAN_CAPTCHA_TTL_SECONDS=300
 # :captcha:
-#   :provider: turnstile
-#   :turnstile:
-#     :site_key: ''
-#     :secret_key: ''
+#   :ttl_seconds: 300
 
 # Local administrative settings for application domain, fqdn, foreman URL,
 # administrator email address etc. If you don't have a Puppet provisioning

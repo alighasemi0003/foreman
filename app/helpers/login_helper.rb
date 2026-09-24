@@ -5,8 +5,8 @@ module LoginHelper
       caption: Setting.replace_keywords(Setting[:login_text]),
       alerts: flash_inline,
       logoSrc: image_path("login_logo.png"),
-      # Only enabled/provider/siteKey — never Turnstile secret.
-      captcha: Foreman::Captcha.frontend_config,
+      # Local CAPTCHA: question only — never the answer.
+      captcha: Foreman::Captcha.frontend_config(session),
     }
   end
 

@@ -248,6 +248,7 @@ Foreman::Application.routes.draw do
     collection do
       get 'login'
       post 'login'
+      get 'captcha_challenge'
       get 'logout'
       post 'logout'
       get 'extlogin'
