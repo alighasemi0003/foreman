@@ -40,9 +40,11 @@ services:
       - FOREMAN_RAILS_CACHE_STORE_URLS=redis://redis-cache:6379/0
       - DYNFLOW_REDIS_URL=redis://redis-tasks:6379/0
       - REDIS_PROVIDER=DYNFLOW_REDIS_URL
-      # Turnstile keys only (enable CAPTCHA via Administer → Settings). Never commit real values.
-      - FOREMAN_TURNSTILE_SITE_KEY=${FOREMAN_TURNSTILE_SITE_KEY:-}
-      - FOREMAN_TURNSTILE_SECRET_KEY=${FOREMAN_TURNSTILE_SECRET_KEY:-}
+      # Turnstile keys (enable CAPTCHA via Administer → Settings). Defaults are Cloudflare
+      # official always-pass *test* keys for local Docker only — override via host ENV for real keys.
+      # Do not put production secrets here. FOREMAN_CAPTCHA_ENABLED is NOT used (Setting toggle).
+      - FOREMAN_TURNSTILE_SITE_KEY=${FOREMAN_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      - FOREMAN_TURNSTILE_SECRET_KEY=${FOREMAN_TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
       - FOREMAN_CAPTCHA_PROVIDER=${FOREMAN_CAPTCHA_PROVIDER:-turnstile}
     hostname: foreman.example.com
     links:
