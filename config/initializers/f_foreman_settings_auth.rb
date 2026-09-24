@@ -27,6 +27,11 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Foreman will block user logins from an IP address after this number of failed login attempts for 5 minutes. Set to 0 to disable bruteforce protection"),
       default: 30,
       full_name: N_('Failed login attempts limit'))
+    setting('captcha_enabled',
+      type: :boolean,
+      description: N_("Require Cloudflare Turnstile verification for interactive password logins. Turnstile site and secret keys must be provided by deployment (FOREMAN_TURNSTILE_SITE_KEY / FOREMAN_TURNSTILE_SECRET_KEY)."),
+      default: false,
+      full_name: N_('Login CAPTCHA'))
     setting('account_lockout_attempts',
       type: :integer,
       description: N_("Number of consecutive failed password attempts against a local (internal) user account within the lockout window before the account is temporarily locked. Does not apply to LDAP or external authentication providers."),

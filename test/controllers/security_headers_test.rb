@@ -72,17 +72,15 @@ class SecurityHeadersTest < ActiveSupport::TestCase
     end
   end
 
-  test 'CSP does not allow Turnstile origin when captcha disabled' do
-    prev = SETTINGS[:captcha]
-    SETTINGS[:captcha] = { enabled: false }
-    # CSP is configured at boot; assert current runtime CSP (captcha off by default in test)
+  test 'CSP always allows exact Turnstile origin for dynamic CAPTCHA toggle' do
     status, headers = fetch_headers('/api/v2/ping')
     assert_equal 200, status
     csp = header(headers, 'Content-Security-Policy').to_s
-    refute_match(/challenges\.cloudflare\.com/, csp)
-    refute_match(/\*/, csp.split('script-src').last.to_s.split(';').first) if csp.include?('script-src')
-  ensure
-    SETTINGS[:captcha] = prev
+    # secure_headers may emit host-only sources (scheme implied https for this origin).
+    assert_match(/challenges\.cloudflare\.com/, csp)
+    refute_match(%r{https?://\*| \* }, csp)
+    script_src = csp[%r{script-src[^;]*}].to_s
+    refute_match(/(?:^|\s)\*(?:\s|$)/, script_src)
   end
 
   test 'HTTPS response includes HSTS with includeSubDomains' do

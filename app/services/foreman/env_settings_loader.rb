@@ -54,8 +54,7 @@ module Foreman
         'FOREMAN_RAILS_CACHE_STORE_OPTIONS_CONNECT_TIMEOUT' => [:float, :rails_cache_store, :options, :connect_timeout],
         'FOREMAN_RAILS_CACHE_STORE_OPTIONS_READ_TIMEOUT' => [:float, :rails_cache_store, :options, :read_timeout],
         'FOREMAN_RAILS_CACHE_STORE_OPTIONS_WRITE_TIMEOUT' => [:float, :rails_cache_store, :options, :write_timeout],
-        # Login CAPTCHA (Cloudflare Turnstile). Secret must stay server-side only.
-        'FOREMAN_CAPTCHA_ENABLED' => [:boolean, :captcha, :enabled],
+        # Turnstile keys (deployment secrets). Enable/disable is Setting[:captcha_enabled].
         'FOREMAN_CAPTCHA_PROVIDER' => [:string, :captcha, :provider],
         'FOREMAN_TURNSTILE_SITE_KEY' => [:string, :captcha, :turnstile, :site_key],
         'FOREMAN_TURNSTILE_SECRET_KEY' => [:string, :captcha, :turnstile, :secret_key],

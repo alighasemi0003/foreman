@@ -5,30 +5,59 @@ require 'json'
 
 class ForemanCaptchaTest < ActiveSupport::TestCase
   setup do
-    @prev = SETTINGS[:captcha]
+    @prev_setting = Setting[:captcha_enabled]
+    @prev_settings = SETTINGS[:captcha]
+    Setting[:captcha_enabled] = false
+    SETTINGS[:captcha] = nil
   end
 
   teardown do
-    SETTINGS[:captcha] = @prev
+    Setting[:captcha_enabled] = @prev_setting
+    SETTINGS[:captcha] = @prev_settings
   end
 
-  def enable_turnstile!(site: 'test-site-key', secret: 'test-secret-key')
+  def enable_turnstile_keys!(site: 'test-site-key', secret: 'test-secret-key')
     SETTINGS[:captcha] = {
-      enabled: true,
       provider: 'turnstile',
       turnstile: { site_key: site, secret_key: secret },
     }
   end
 
-  test 'disabled captcha verify succeeds without HTTP' do
-    SETTINGS[:captcha] = { enabled: false }
+  test 'captcha_enabled setting defaults to false' do
+    definition = Foreman.settings.find('captcha_enabled')
+    assert_not_nil definition
+    assert_equal false, definition.default
+    assert_equal 'auth', definition.category
+  end
+
+  test 'disabled setting verify succeeds without HTTP' do
+    Setting[:captcha_enabled] = false
+    enable_turnstile_keys!
     Net::HTTP.any_instance.expects(:request).never
     result = Foreman::Captcha.verify('anything')
     assert result.success?
   end
 
+  test 'enabled? follows Setting without restart' do
+    enable_turnstile_keys!
+    Setting[:captcha_enabled] = false
+    refute Foreman::Captcha.enabled?
+    assert_equal false, Foreman::Captcha.frontend_config[:enabled]
+
+    Setting[:captcha_enabled] = true
+    assert Foreman::Captcha.enabled?
+    cfg = Foreman::Captcha.frontend_config
+    assert_equal true, cfg[:enabled]
+    assert_equal 'test-site-key', cfg[:siteKey]
+
+    Setting[:captcha_enabled] = false
+    refute Foreman::Captcha.enabled?
+    assert_equal false, Foreman::Captcha.frontend_config[:enabled]
+  end
+
   test 'frontend_config never includes secret' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     cfg = Foreman::Captcha.frontend_config
     assert_equal true, cfg[:enabled]
     assert_equal 'turnstile', cfg[:provider]
@@ -39,22 +68,40 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
   end
 
   test 'enabled with blank token fails closed' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     Net::HTTP.any_instance.expects(:request).never
     result = Foreman::Captcha.verify('  ')
     assert result.failed?
     assert_equal :failed, result.status
   end
 
-  test 'enabled with missing configuration fails closed' do
-    SETTINGS[:captcha] = { enabled: true, provider: 'turnstile', turnstile: { site_key: '', secret_key: '' } }
+  test 'enabled with missing site key fails closed' do
+    Setting[:captcha_enabled] = true
+    SETTINGS[:captcha] = {
+      provider: 'turnstile',
+      turnstile: { site_key: '', secret_key: 'test-secret-key' },
+    }
+    Net::HTTP.any_instance.expects(:request).never
+    result = Foreman::Captcha.verify('token')
+    assert_equal :configuration_error, result.status
+    assert Foreman::Captcha.frontend_config[:configurationError]
+  end
+
+  test 'enabled with missing secret key fails closed' do
+    Setting[:captcha_enabled] = true
+    SETTINGS[:captcha] = {
+      provider: 'turnstile',
+      turnstile: { site_key: 'test-site-key', secret_key: '' },
+    }
     Net::HTTP.any_instance.expects(:request).never
     result = Foreman::Captcha.verify('token')
     assert_equal :configuration_error, result.status
   end
 
   test 'valid turnstile response succeeds' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     http_response = mock('response')
     http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(true)
     http_response.stubs(:body).returns({ 'success' => true }.to_json)
@@ -65,7 +112,8 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
   end
 
   test 'invalid turnstile response fails' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     http_response = mock('response')
     http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(true)
     http_response.stubs(:body).returns({ 'success' => false, 'error-codes' => ['invalid-input-response'] }.to_json)
@@ -76,7 +124,8 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
   end
 
   test 'provider HTTP error fails closed' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     http_response = mock('response')
     http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(false)
     http_response.stubs(:code).returns('500')
@@ -87,7 +136,8 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
   end
 
   test 'timeout fails closed' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     Net::HTTP.any_instance.expects(:request).raises(Net::ReadTimeout)
 
     result = Foreman::Captcha.verify('token')
@@ -95,7 +145,8 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
   end
 
   test 'malformed JSON fails closed' do
-    enable_turnstile!
+    Setting[:captcha_enabled] = true
+    enable_turnstile_keys!
     http_response = mock('response')
     http_response.stubs(:is_a?).with(Net::HTTPSuccess).returns(true)
     http_response.stubs(:body).returns('not-json')

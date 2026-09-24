@@ -97,4 +97,25 @@ describe('LoginPage', () => {
     expect(document.body.innerHTML).not.toContain('server-secret');
     delete window.turnstile;
   });
+
+  it('shows configuration error and keeps submit disabled when enabled without site key', async () => {
+    renderLoginPage({
+      captcha: {
+        enabled: true,
+        provider: 'turnstile',
+        siteKey: null,
+        configurationError: true,
+      },
+    });
+    expect(
+      screen.getByText(/CAPTCHA is enabled but is not configured/i)
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-ouia-component-id="login-captcha"]')
+    ).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText('Username'), 'admin');
+    await userEvent.type(screen.getByPlaceholderText('Password'), 'secret');
+    expect(screen.getByRole('button', { name: 'Log In' })).toBeDisabled();
+  });
 });

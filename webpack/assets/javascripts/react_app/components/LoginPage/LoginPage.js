@@ -32,8 +32,16 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
   const widgetIdRef = useRef(null);
   const containerRef = useRef(null);
 
-  const captchaEnabled = !!(captcha && captcha.enabled && captcha.siteKey);
-  const captchaReady = !captchaEnabled || (!!captchaToken && !captchaLoadError);
+  // Setting enabled server-side; widget needs a site key. Misconfiguration must
+  // not silently bypass the challenge (submit stays disabled).
+  const captchaRequested = !!(captcha && captcha.enabled);
+  const captchaConfigError =
+    captchaRequested &&
+    (!!captcha.configurationError || !captcha.siteKey);
+  const captchaEnabled = captchaRequested && !!captcha.siteKey && !captchaConfigError;
+  const captchaReady =
+    !captchaRequested ||
+    (captchaEnabled && !!captchaToken && !captchaLoadError && !captchaConfigError);
 
   const updateSubmitDisabled = (user, pass, challengeOk) => {
     setIsLoginDisabled(!(user !== '' && pass !== '' && challengeOk));
@@ -58,6 +66,13 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
       }
     }
   };
+
+  useEffect(() => {
+    if (captchaConfigError) {
+      setCaptchaLoadError(true);
+      setIsLoginDisabled(true);
+    }
+  }, [captchaConfigError]);
 
   useEffect(() => {
     if (!captchaEnabled) {
@@ -148,7 +163,7 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
   };
 
   const handleSubmit = event => {
-    if (captchaEnabled && (!captchaToken || captchaLoadError)) {
+    if (captchaRequested && (!captchaToken || captchaLoadError || captchaConfigError)) {
       event.preventDefault();
       setCaptchaLoadError(true);
       setIsLoginDisabled(true);
@@ -159,6 +174,14 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
       setIsLoginDisabled(true);
     }, 10);
   };
+
+  const captchaErrorTitle = captchaConfigError
+    ? __(
+        'CAPTCHA is enabled but is not configured. Please contact your administrator.'
+      )
+    : __(
+        'CAPTCHA could not be loaded. Please retry or contact your administrator.'
+      );
 
   const loginForm = (
     <Form {...defaultFormProps.attributes}>
@@ -211,26 +234,28 @@ const LoginPage = ({ alerts, caption, logoSrc, token, captcha }) => {
           {...defaultFormProps.passwordField}
         />
       </FormGroup>
-      {captchaEnabled && (
+      {(captchaEnabled || captchaConfigError) && (
         <FormGroup fieldId="login-captcha">
-          <div
-            id="turnstile-container"
-            ref={containerRef}
-            data-ouia-component-id="login-captcha"
-          />
-          <input
-            type="hidden"
-            name="login[captcha_response]"
-            value={captchaToken}
-            readOnly
-          />
-          {captchaLoadError && (
+          {captchaEnabled && (
+            <>
+              <div
+                id="turnstile-container"
+                ref={containerRef}
+                data-ouia-component-id="login-captcha"
+              />
+              <input
+                type="hidden"
+                name="login[captcha_response]"
+                value={captchaToken}
+                readOnly
+              />
+            </>
+          )}
+          {(captchaLoadError || captchaConfigError) && (
             <Alert
               ouiaId="login-captcha-load-error"
               variant="danger"
-              title={__(
-                'CAPTCHA could not be loaded. Please retry or contact your administrator.'
-              )}
+              title={captchaErrorTitle}
               aria-live="polite"
               isInline
             />
@@ -283,6 +308,7 @@ LoginPage.propTypes = {
     enabled: PropTypes.bool,
     provider: PropTypes.string,
     siteKey: PropTypes.string,
+    configurationError: PropTypes.bool,
   }),
 };
 

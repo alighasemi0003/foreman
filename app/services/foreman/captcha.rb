@@ -2,6 +2,8 @@
 
 module Foreman
   # Interactive login anti-bot challenge (Cloudflare Turnstile).
+  # Enable/disable via Administer → Settings → Authentication → Login CAPTCHA
+  # (Setting[:captcha_enabled]). Site/secret keys remain deployment ENV.
   # Applies only to password-form Local/LDAP login — not API, PAT, JWT,
   # extlogin/OIDC/REMOTE_USER, or reauthentication.
   module Captcha
@@ -21,10 +23,12 @@ module Foreman
 
     module_function
 
+    # Authoritative runtime switch: Foreman Setting (no restart required).
     def enabled?
-      !!SETTINGS.dig(:captcha, :enabled)
+      !!Setting[:captcha_enabled]
     end
 
+    # Provider is fixed to Turnstile for now; ENV may override for future use.
     def provider
       (SETTINGS.dig(:captcha, :provider).presence || 'turnstile').to_s.downcase
     end
@@ -45,6 +49,7 @@ module Foreman
         enabled: true,
         provider: provider,
         siteKey: site_key,
+        configurationError: !configuration_valid?,
       }
     end
 

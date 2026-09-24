@@ -20,17 +20,16 @@
 # so only change this if you know what you're doing.
 :hsts_enabled: true
 
-# Interactive login CAPTCHA (Cloudflare Turnstile). Disabled by default.
-# Enable only when you have Cloudflare Turnstile site + secret keys.
-# Enabling causes the login browser and Foreman server to communicate with
-# Cloudflare (https://challenges.cloudflare.com). Prefer ENV variables:
-#   FOREMAN_CAPTCHA_ENABLED=true
-#   FOREMAN_CAPTCHA_PROVIDER=turnstile
+# Interactive login CAPTCHA (Cloudflare Turnstile).
+# Enable/disable at runtime via Administer → Settings → Authentication →
+# "Login CAPTCHA" (Setting captcha_enabled). Default is OFF; no restart needed.
+# Deploy site + secret keys via ENV (secret never goes in Settings UI / Git):
 #   FOREMAN_TURNSTILE_SITE_KEY=<site-key>
 #   FOREMAN_TURNSTILE_SECRET_KEY=<secret-key>
-# Never put the secret key in frontend code or commit real keys to Git.
+# Optional: FOREMAN_CAPTCHA_PROVIDER=turnstile (only provider supported).
+# Enabling CAPTCHA causes the login browser and Foreman server to communicate
+# with Cloudflare (https://challenges.cloudflare.com).
 # :captcha:
-#   :enabled: false
 #   :provider: turnstile
 #   :turnstile:
 #     :site_key: ''

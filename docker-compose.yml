@@ -40,6 +40,10 @@ services:
       - FOREMAN_RAILS_CACHE_STORE_URLS=redis://redis-cache:6379/0
       - DYNFLOW_REDIS_URL=redis://redis-tasks:6379/0
       - REDIS_PROVIDER=DYNFLOW_REDIS_URL
+      # Turnstile keys only (enable CAPTCHA via Administer → Settings). Never commit real values.
+      - FOREMAN_TURNSTILE_SITE_KEY=${FOREMAN_TURNSTILE_SITE_KEY:-}
+      - FOREMAN_TURNSTILE_SECRET_KEY=${FOREMAN_TURNSTILE_SECRET_KEY:-}
+      - FOREMAN_CAPTCHA_PROVIDER=${FOREMAN_CAPTCHA_PROVIDER:-turnstile}
     hostname: foreman.example.com
     links:
       - db
