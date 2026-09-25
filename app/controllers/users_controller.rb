@@ -123,7 +123,15 @@ class UsersController < ApplicationController
     return unless ensure_reauthenticated!('users.invalidate_jwt')
 
     user_ids = User.authorized(:edit_users).ids.uniq
-    JwtSecret.where(user_id: user_ids).destroy_all
+    User.invalidate_jwts_for!(user_ids)
+    Foreman::SecurityEvent.log(
+      event: 'JWT_INVALIDATE_ALL',
+      status: 'SUCCESS',
+      actor: User.current&.login,
+      ip: request.remote_ip,
+      target: "users=#{user_ids.size}",
+      details: 'Invalidated registration JWTs for all authorized users'
+    )
     process_success(
       :success_msg => _('Successfully invalidated registration tokens for all users.')
     )
@@ -133,7 +141,15 @@ class UsersController < ApplicationController
     @user = find_resource(:edit_users)
     return unless ensure_reauthenticated!('users.invalidate_jwt')
 
-    @user.jwt_secret&.destroy
+    @user.invalidate_jwt!
+    Foreman::SecurityEvent.log(
+      event: 'JWT_INVALIDATE',
+      status: 'SUCCESS',
+      actor: User.current&.login,
+      ip: request.remote_ip,
+      target: @user.login,
+      details: 'Invalidated registration JWTs for user'
+    )
     respond_to do |format|
       format.html do
         process_success(

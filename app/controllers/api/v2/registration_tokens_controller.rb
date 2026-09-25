@@ -36,8 +36,16 @@ module Api
         @user = find_resource(:edit_users)
         return unless ensure_reauthenticated!('users.invalidate_jwt')
 
-        @user.jwt_secret&.destroy
+        @user.invalidate_jwt!
         login = @user.login
+        Foreman::SecurityEvent.log(
+          event: 'JWT_INVALIDATE',
+          status: 'SUCCESS',
+          actor: User.current&.login,
+          ip: request.remote_ip,
+          target: login,
+          details: 'Invalidated registration JWTs for user (API)'
+        )
         render :json => { :message => _("Successfully invalidated registration tokens."), :user => login}, :status => :ok
       end
 
@@ -54,8 +62,16 @@ module Api
         @users = resource_scope_for_index(:permission => :edit_users).except_hidden.uniq
         if @users.blank?
           raise ::Foreman::Exception.new(N_("No record found for search '%s'"), params[:search]) end
-        JwtSecret.where(user_id: @users).destroy_all
+        User.invalidate_jwts_for!(@users.map(&:id))
         login = @users.pluck(:login).to_sentence
+        Foreman::SecurityEvent.log(
+          event: 'JWT_INVALIDATE_SEARCH',
+          status: 'SUCCESS',
+          actor: User.current&.login,
+          ip: request.remote_ip,
+          target: login,
+          details: 'Invalidated registration JWTs for searched users (API)'
+        )
         render :json => { :message => _("Successfully invalidated registration tokens."), :users => login}, :status => :ok
       end
     end

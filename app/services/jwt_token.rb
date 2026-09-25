@@ -40,6 +40,9 @@ class JwtToken < Struct.new(:token)
 
     payload = JWT.decode(token, secret.token)
     payload.first
+  rescue JWT::DecodeError
+    # Includes VerificationError when the per-user signing secret was rotated/invalidated.
+    nil
   end
 
   def to_s
@@ -68,7 +71,8 @@ class JwtToken < Struct.new(:token)
 
   def secret
     return @secret if defined? @secret
-    @secret = JwtSecret.find_by(user: user_id)
+    # user_id comes from the (unverified) payload; look up the signing secret by id.
+    @secret = user_id.present? ? JwtSecret.find_by(user_id: user_id) : nil
   end
 
   def user_id

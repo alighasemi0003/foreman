@@ -74,9 +74,7 @@ class JwtTokenTest < ActiveSupport::TestCase
     JwtSecret.stubs(:find_by).returns(jwt_secret)
     jwt_token = JwtToken.new(token)
 
-    assert_raises JWT::VerificationError do
-      jwt_token.decode
-    end
+    assert_nil jwt_token.decode
   end
 
   test 'decoding expired token' do
@@ -85,6 +83,6 @@ class JwtTokenTest < ActiveSupport::TestCase
     user = OpenStruct.new(id: 123)
     jwt_token = JwtToken.new(JwtToken.encode(user, jwt_secret.token, expiration: -1).token)
 
-    assert_raise(JWT::ExpiredSignature) { jwt_token.decode }
+    assert_nil jwt_token.decode
   end
 end

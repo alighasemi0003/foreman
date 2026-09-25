@@ -4,7 +4,10 @@
     hash_for_invalidate_jwt_for_all_users_users_path.merge(:auth_object => User.current, :permission => "edit_users"),
     :class => "btn btn-default",
     :method => :delete,
-    :data => { :confirm => _("Invalidate all JSON Web Tokens for all users?")} ) %>
+    :data => {
+      :confirm => _("Invalidate all JSON Web Tokens for all users?"),
+      :foreman_reauth => true,
+    }) %>
 
 <table class="<%= table_css_classes 'table-fixed' %>">
   <thead>
