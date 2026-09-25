@@ -58,7 +58,12 @@ class UsersController < ApplicationController
 
       process_success((editing_self? && !current_user.allowed_to?({:controller => 'users', :action => 'index'})) ? { :success_redirect => helpers.current_hosts_path } : { :success_redirect => users_path })
     else
-      process_error
+      # Keep forced-change users on the minimal password form with a visible error.
+      if was_required && editing_self?
+        process_error(:error_msg => @user.errors.full_messages.to_sentence.presence || _('Unable to change password'))
+      else
+        process_error
+      end
     end
   end
 

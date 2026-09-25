@@ -1,3 +1,7 @@
-<% title _("Edit %s") % @user.to_s %>
-
-<%= render :partial => 'form' %>
+<% if @editing_self && @user.password_change_required? %>
+  <% title _("Change your password") %>
+  <%= render :partial => 'password_change_required_form' %>
+<% else %>
+  <% title _("Edit %s") % @user.to_s %>
+  <%= render :partial => 'form' %>
+<% end %>

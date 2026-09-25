@@ -87,9 +87,21 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
     assert_response :success
     assert_match(/must be different from the current password/i, response.body)
     refute_match(/Password1!/, response.body)
+    # Forced-change UX: minimal password form, not the full multi-tab edit UI
+    assert_match(/Change your password|Password change required/i, response.body)
+    refute_match(/Registration Tokens|Personal Access Tokens|SSH Keys/i, response.body)
     user.reload
     assert user.password_change_required?
     assert user.matching_password?('Password1!')
+  end
+
+  test 'forced user edit page uses minimal password form' do
+    user = create_local_user!(force: true)
+    get :edit, params: { id: user.id }, session: set_session_user(user)
+    assert_response :success
+    assert_match(/Change your password|Password change required/i, response.body)
+    refute_match(/Registration Tokens|Personal Access Tokens/i, response.body)
+    assert_select 'input[name=?]', 'user[current_password]'
   end
 
   test 'voluntary self change rejects reuse of current password' do
