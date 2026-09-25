@@ -115,6 +115,9 @@ class User < ApplicationRecord
     :check_permissions_for_changing_login, :ensure_not_disabling_itself
   before_validation :verify_current_password, :if => proc { |user| user == User.current },
                     :unless => proc { |user| user.password.empty? }
+  # Must run before prepare_password mutates password_hash / password_salt.
+  before_validation :ensure_new_password_differs_from_current,
+                    :if => proc { |user| user.manage_password? && user.password.present? && user.password_hash.present? }
   before_validation :prepare_password, :normalize_mail
   before_save       :set_lower_login
   before_save       :normalize_timezone
@@ -722,6 +725,15 @@ class User < ApplicationRecord
     unless matching_password?(current_password)
       errors.add :current_password, _("Incorrect password")
     end
+  end
+
+  # Reject self (and other) password updates that reuse the existing password.
+  # Compares against the stored hash with the current salt — never logs plaintext.
+  def ensure_new_password_differs_from_current
+    type = Foreman::PasswordHash.detect_implementation(password_salt)
+    return unless password_hash == hash_password(password, type)
+
+    errors.add(:password, _("The new password must be different from the current password."))
   end
 
   protected

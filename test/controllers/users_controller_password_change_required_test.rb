@@ -74,6 +74,57 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
     assert user.password_change_required?
   end
 
+  test 'forced user cannot reuse current password and keeps flag' do
+    user = create_local_user!(force: true)
+    put :update, params: {
+      id: user.id,
+      user: {
+        current_password: 'Password1!',
+        password: 'Password1!',
+        password_confirmation: 'Password1!',
+      },
+    }, session: set_session_user(user)
+    assert_response :success
+    assert_match(/must be different from the current password/i, response.body)
+    refute_match(/Password1!/, response.body)
+    user.reload
+    assert user.password_change_required?
+    assert user.matching_password?('Password1!')
+  end
+
+  test 'voluntary self change rejects reuse of current password' do
+    user = create_local_user!(force: false)
+    put :update, params: {
+      id: user.id,
+      user: {
+        current_password: 'Password1!',
+        password: 'Password1!',
+        password_confirmation: 'Password1!',
+      },
+    }, session: set_session_user(user)
+    assert_response :success
+    assert_match(/must be different from the current password/i, response.body)
+    user.reload
+    refute user.password_change_required?
+    assert user.matching_password?('Password1!')
+  end
+
+  test 'forced user different password clears flag' do
+    user = create_local_user!(force: true)
+    put :update, params: {
+      id: user.id,
+      user: {
+        current_password: 'Password1!',
+        password: 'Password2!',
+        password_confirmation: 'Password2!',
+      },
+    }, session: set_session_user(user)
+    assert_response :redirect
+    user.reload
+    refute user.password_change_required?
+    assert user.matching_password?('Password2!')
+  end
+
   test 'logout succeeds while force password change is set' do
     user = create_local_user!(force: true)
     delete :logout, session: set_session_user(user)
