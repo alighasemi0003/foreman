@@ -2,6 +2,7 @@ class NotificationRecipientsController < Api::V2::BaseController
   include Foreman::Controller::Parameters::NotificationRecipient
   skip_before_action :update_activity_time, :only => [:index]
   before_action :find_resource, :only => [:update, :destroy]
+  # Api::BaseController already runs enforce_password_change_required.
 
   def index
     payload = UINotifications::CacheHandler.new(User.current.id).payload

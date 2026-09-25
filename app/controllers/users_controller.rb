@@ -40,6 +40,8 @@ class UsersController < ApplicationController
   def edit
     editing_self?
     @user = find_resource(:edit_users)
+    return render_forced_password_change_form if forced_password_change_flow?
+
     (MailNotification.authorized_as(@user, :view_mail_notifications).subscriptable - @user.mail_notifications).sort_by(&:name).each do |mail_notification|
       @user.user_mail_notifications.build(:mail_notification_id => mail_notification.id)
     end
@@ -56,14 +58,18 @@ class UsersController < ApplicationController
       clear_password_change_required_after_own_password_update!
       log_password_change_required_assigned!(@user) if !was_required && @user.password_change_required?
 
+      # Forced change must end the current browser session and require a fresh login.
+      if was_required && editing_self? && user_params[:password].present?
+        return complete_forced_password_change_logout!
+      end
+
       process_success((editing_self? && !current_user.allowed_to?({:controller => 'users', :action => 'index'})) ? { :success_redirect => helpers.current_hosts_path } : { :success_redirect => users_path })
     else
-      # Keep forced-change users on the minimal password form with a visible error.
       if was_required && editing_self?
-        process_error(:error_msg => @user.errors.full_messages.to_sentence.presence || _('Unable to change password'))
-      else
-        process_error
+        flash.now[:error] = @user.errors.full_messages.to_sentence.presence || _('Unable to change password')
+        return render_forced_password_change_form
       end
+      process_error
     end
   end
 
@@ -434,6 +440,28 @@ class UsersController < ApplicationController
       target: @user.login,
       details: 'User completed required password change'
     )
+  end
+
+  def forced_password_change_flow?
+    editing_self? && @user&.password_change_required?
+  end
+
+  def render_forced_password_change_form
+    render :password_change_required, :layout => 'password_change_required'
+  end
+
+  # After a required password change, end the Rails session so the new password
+  # must be used at login. Does not invalidate registration JWTs.
+  def complete_forced_password_change_logout!
+    TopbarSweeper.expire_cache
+    user_login = @user.login
+    Foreman::Reauthentication.clear!(session)
+    session[:user] = @user = User.current = nil
+    reset_session
+    # Login page reads flash[:inline] via login_props / flash_inline
+    inline_success _("Password changed successfully. Please sign in again.")
+    logger.info("User '#{user_login}' completed forced password change; session ended")
+    redirect_to login_users_path
   end
 
   def log_password_change_required_assigned!(user)

@@ -4,9 +4,12 @@ module Api
     include ApplicationShared
     include Foreman::Controller::ApiCsrfProtection
     include Foreman::Controller::BruteforceProtection
+    include Foreman::Controller::PasswordChangeRequired
 
     before_action :load_settings
     before_action :set_default_response_format, :authorize, :set_taxonomy
+    # After authorize so User.current is set for interactive-session gating.
+    before_action :enforce_password_change_required
     before_action :check_media_type
     before_action :assign_lone_taxonomies, :only => :create
     before_action :add_info_headers, :set_gettext_locale
