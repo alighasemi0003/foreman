@@ -61,7 +61,9 @@
                                    :verify => {name: 'user[password_confirmation]', :error => f.object.errors[:password_confirmation].present? ? f.object.errors[:password_confirmation].to_sentence : false},
                                    :error => (f.object.errors[:password].presence || f.object.errors[:password_hash].presence)&.to_sentence || false,
                                    :required => f.object.new_record? }}) %>
-        <% if @user.manage_password? && User.current != @user %>
+        <%# Render for any non-self edit; #password + authSourceSelected JS hide this for non-INTERNAL.
+            Do not gate on manage_password? — new users often have nil auth_source until Authorized by is set. %>
+        <% if User.current != @user %>
           <%= checkbox_f f, :password_change_required,
                          :label => _('Require password change on next login'),
                          :label_help => _('When enabled, the user must change their password before accessing Foreman.') %>

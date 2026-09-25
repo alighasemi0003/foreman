@@ -19,6 +19,9 @@ class UsersController < ApplicationController
 
   def new
     @user = User.new
+    # Default to Internal so password fields + force-change checkbox are visible for local users.
+    # External/LDAP selection still hides #password via authSourceSelected JS; sanitize clears the flag.
+    @user.auth_source = AuthSourceInternal.unscoped.first
     @user.password_change_required = true
   end
 
