@@ -7,7 +7,7 @@ class UsersController < ApplicationController
 
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
-  skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :only => [:login, :logout, :extlogout, :captcha_challenge]
+  skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :enforce_password_change_required, :only => [:login, :logout, :extlogout, :captcha_challenge]
   skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation, :reauthenticate]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
@@ -19,6 +19,7 @@ class UsersController < ApplicationController
 
   def new
     @user = User.new
+    @user.password_change_required = true
   end
 
   def create
@@ -26,6 +27,7 @@ class UsersController < ApplicationController
 
     @user = User.new(user_params)
     if @user.save
+      log_password_change_required_assigned!(@user)
       process_success
     else
       process_error
@@ -44,9 +46,12 @@ class UsersController < ApplicationController
     editing_self?
     @user = find_resource(:edit_users)
     return unless ensure_user_update_reauthenticated!(@user, user_params)
+    was_required = @user.password_change_required?
     if @user.update(user_params)
       update_sub_hostgroups_owners
       clear_reauth_after_password_change_if_needed!
+      clear_password_change_required_after_own_password_update!
+      log_password_change_required_assigned!(@user) if !was_required && @user.password_change_required?
 
       process_success((editing_self? && !current_user.allowed_to?({:controller => 'users', :action => 'index'})) ? { :success_redirect => helpers.current_hosts_path } : { :success_redirect => users_path })
     else
@@ -392,6 +397,33 @@ class UsersController < ApplicationController
     Foreman::Reauthentication.clear!(session)
   end
 
+  def clear_password_change_required_after_own_password_update!
+    return unless editing_self?
+    return if user_params[:password].blank?
+    return unless @user.password_change_required?
+
+    @user.update_column(:password_change_required, false)
+    Foreman::SecurityEvent.log(
+      event: 'FORCED_PASSWORD_CHANGE_COMPLETED',
+      status: 'SUCCESS',
+      actor: User.current&.login,
+      target: @user.login,
+      details: 'User completed required password change'
+    )
+  end
+
+  def log_password_change_required_assigned!(user)
+    return unless user.password_change_required?
+
+    Foreman::SecurityEvent.log(
+      event: 'PASSWORD_CHANGE_REQUIRED',
+      status: 'SUCCESS',
+      actor: User.current&.login,
+      target: user.login,
+      details: 'Password change required on next login'
+    )
+  end
+
   def login_user(user)
     logger.info("User '#{user.login}' logged in from '#{request.ip}'")
     log_authentication_event('login', user, "User '#{user.login}' logged in")
@@ -407,6 +439,11 @@ class UsersController < ApplicationController
     store_default_taxonomy(user, 'location') unless session.has_key?(:location_id)
     TopbarSweeper.expire_cache
     telemetry_increment_counter(:successful_ui_logins)
+    if user.password_change_required?
+      warning(_("You must change your password before continuing."))
+      redirect_to edit_user_path(user)
+      return
+    end
     redirect_to (uri || helpers.current_hosts_path)
   end
 

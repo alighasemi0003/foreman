@@ -1,5 +1,5 @@
 
-<%= form_for @user do |f| %>
+<%= form_for @user, :html => { :data => { :foreman_reauth => 'true' } } do |f| %>
   <%= base_errors_for @user %>
 
   <ul class='nav nav-tabs' data-tabs='tabs'>
@@ -51,7 +51,7 @@
 
       <div id='password' <%= display? !@user.manage_password? %>>
         <% if User.current == @user  %>
-          <%= password_f f, :current_password, :label => _('Current password'), :placeholder => '' %>
+          <%= password_f f, :current_password, :label => _('Current password'), :placeholder => '', :autocomplete => 'current-password' %>
         <% end %>
         <%= react_component('PasswordStrength',
                             {data: {:className => 'form-control',
@@ -61,6 +61,11 @@
                                    :verify => {name: 'user[password_confirmation]', :error => f.object.errors[:password_confirmation].present? ? f.object.errors[:password_confirmation].to_sentence : false},
                                    :error => (f.object.errors[:password].presence || f.object.errors[:password_hash].presence)&.to_sentence || false,
                                    :required => f.object.new_record? }}) %>
+        <% if @user.manage_password? && User.current != @user %>
+          <%= checkbox_f f, :password_change_required,
+                         :label => _('Require password change on next login'),
+                         :label_help => _('When enabled, the user must change their password before accessing Foreman.') %>
+        <% end %>
       </div>
     </div>
 

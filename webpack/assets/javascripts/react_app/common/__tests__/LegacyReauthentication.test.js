@@ -273,6 +273,66 @@ describe('LegacyReauthentication adapter', () => {
       contextMessage: 'Delete ali?',
     });
   });
+
+  test('buildFormRequest preserves fields including passwords via FormData', () => {
+    document.body.innerHTML = `
+      <form id="new_user" action="/users" method="post" data-foreman-reauth="true">
+        <input name="authenticity_token" value="form-csrf" />
+        <input name="user[login]" value="newuser" />
+        <input name="user[firstname]" value="Keep" />
+        <input name="user[password]" type="password" value="Secret1!" />
+        <input name="user[password_confirmation]" type="password" value="Secret1!" />
+        <input name="user[password_change_required]" type="checkbox" value="1" checked />
+        <button type="submit" name="commit" value="Submit">Submit</button>
+      </form>`;
+    const form = document.getElementById('new_user');
+    const submitter = form.querySelector('button[type="submit"]');
+    const built = _test.buildFormRequest(form, submitter)();
+    expect(built.url).toBe('/users');
+    expect(built.options.method).toBe('POST');
+    expect(built.options.body).toBeInstanceOf(FormData);
+    expect(built.options.body.get('user[login]')).toBe('newuser');
+    expect(built.options.body.get('user[firstname]')).toBe('Keep');
+    expect(built.options.body.get('user[password]')).toBe('Secret1!');
+    expect(built.options.body.get('commit')).toBe('Submit');
+  });
+
+  test('create-user form reauth opens modal and retries once without second modal', async () => {
+    Reauthentication.promptReauthentication.mockResolvedValue(undefined);
+    global.fetch
+      .mockImplementationOnce(reauthForbidden)
+      .mockImplementationOnce(redirectOk);
+    delete window.location;
+    window.location = { href: '' };
+
+    const formValues = {
+      login: 'keptuser',
+      firstname: 'StillHere',
+      password: 'Secret1!',
+    };
+    const build = jest.fn(() => ({
+      url: '/users',
+      options: {
+        method: 'POST',
+        body: (() => {
+          const fd = new FormData();
+          fd.set('user[login]', formValues.login);
+          fd.set('user[firstname]', formValues.firstname);
+          fd.set('user[password]', formValues.password);
+          return fd;
+        })(),
+      },
+    }));
+
+    await submitLegacyWithReauth(build);
+
+    expect(Reauthentication.promptReauthentication).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(formValues.login).toBe('keptuser');
+    expect(formValues.firstname).toBe('StillHere');
+    expect(window.location.href).toBe('/users');
+  });
 });
 
 describe('actionDisplayLabel', () => {

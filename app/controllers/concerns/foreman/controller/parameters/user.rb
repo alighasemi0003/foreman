@@ -27,6 +27,7 @@ module Foreman::Controller::Parameters::User
           ctx.permit :admin if ctx.currently_admin? && (ctx.ui? || ctx.api?)
           if !ctx.editing_self? && (ctx.ui? || ctx.api?)
             ctx.permit :auth_source, :auth_source_id, :auth_source_name,
+              :password_change_required,
               :roles => [], :role_ids => [], :role_names => []
           end
         end

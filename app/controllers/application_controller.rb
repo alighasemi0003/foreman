@@ -3,6 +3,7 @@ class ApplicationController < ActionController::Base
 
   include Foreman::Controller::Flash
   include Foreman::Controller::Authorize
+  include Foreman::Controller::PasswordChangeRequired
 
   protect_from_forgery with: :exception # See ActionController::RequestForgeryProtection for details
   # Always register; re-raise when requests are treated as local (dev/test default).
@@ -19,6 +20,7 @@ class ApplicationController < ActionController::Base
 
   before_action :load_settings
   before_action :require_login, :check_user_enabled
+  before_action :enforce_password_change_required
   before_action :set_gettext_locale_db, :set_gettext_locale
   before_action :session_expiry, :update_activity_time, :unless => proc { |c| c.remote_user_provided? || c.api_request? }
   before_action :set_taxonomy, :require_mail, :check_empty_taxonomy

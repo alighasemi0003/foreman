@@ -56,6 +56,7 @@ const PasswordStrength = ({
             id="password_confirmation"
             name={verify.name}
             type="password"
+            autoComplete="new-password"
             onChange={({ target }) => updatePasswordConfirmation(target.value)}
             className="form-control"
           />

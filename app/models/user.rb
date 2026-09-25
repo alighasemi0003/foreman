@@ -29,6 +29,7 @@ class User < ApplicationRecord
 
   attribute :password
 
+  before_validation :sanitize_password_change_required
   after_save :ensure_default_role
 
   attribute :locale, :string, default: -> { Setting[:default_locale].presence }
@@ -831,5 +832,11 @@ class User < ApplicationRecord
     if disabled? && self == User.current
       errors.add :disabled, _('It is not possible to disable yourself')
     end
+  end
+
+  def sanitize_password_change_required
+    # External / LDAP / OIDC users cannot change password in Foreman — never force.
+    self.password_change_required = false unless auth_source&.can_set_password?
+    self.password_change_required = !!password_change_required
   end
 end
