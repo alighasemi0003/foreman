@@ -257,10 +257,12 @@ Foreman::Application.routes.draw do
       post 'reauthenticate'
       delete 'stop_impersonation'
       delete 'invalidate_jwt_for_all_users'
+      delete 'terminate_active_sessions_for_all_users'
     end
     member do
       post 'impersonate'
       patch 'invalidate_jwt'
+      patch 'terminate_active_session'
     end
     resources :ssh_keys, only: [:new, :create, :destroy]
   end

@@ -82,6 +82,7 @@ class ActiveSupport::TestCase
 
   def set_session_user(user = :admin)
     user = user.is_a?(User) ? user : users(user)
+    user.claim_active_session if user.respond_to?(:claim_active_session)
     {
       :user => user.id,
       :expires_at => 5.minutes.from_now,

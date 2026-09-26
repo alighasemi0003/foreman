@@ -2,7 +2,7 @@ require 'digest/sha1'
 
 class User < ApplicationRecord
   audited :except => [:last_login_on, :password_hash, :password_salt, :password_confirmation,
-                      :failed_login_attempts, :failed_login_started_at, :locked_until],
+                      :failed_login_attempts, :failed_login_started_at, :locked_until, :has_active_session],
     :associations => [:roles, :usergroups]
   include Authorizable
   include Foreman::TelemetryHelper
@@ -340,6 +340,7 @@ class User < ApplicationRecord
     User.as_anonymous_admin do
       update_columns(:last_login_on => Time.now.utc)
       ensure_default_role
+      claim_active_session
       if reset_account_lockout && internal? && has_attribute?(:failed_login_attempts) &&
           (failed_login_attempts.to_i > 0 || locked_until.present? || failed_login_started_at.present?)
         logger.info("Resetting account lockout state after successful login for user #{login} (id=#{id})")
@@ -347,6 +348,47 @@ class User < ApplicationRecord
       end
     end
     User.current = self
+  end
+
+  # Tip 3.19 concurrent UI-session flag (Control #20). Concurrent logins are allowed;
+  # logout/admin terminate clears the flag so remaining UI sessions are rejected.
+  def claim_active_session
+    return false unless has_attribute?(:has_active_session)
+
+    claimed = self.class.unscoped.where(:id => id, :has_active_session => false).update_all(:has_active_session => true) == 1
+    self.has_active_session = true if claimed || has_active_session?
+    claimed
+  end
+
+  def release_active_session
+    return unless has_attribute?(:has_active_session)
+
+    self.class.unscoped.where(:id => id).update_all(:has_active_session => false)
+    self.has_active_session = false
+  end
+
+  def terminate_active_sessions!
+    self.class.terminate_active_sessions_for([id])
+  end
+
+  def self.terminate_active_sessions_for(user_ids)
+    user_ids = Array(user_ids).compact.map(&:to_i).uniq
+    return if user_ids.blank?
+    return unless column_names.include?('has_active_session')
+
+    unscoped.where(:id => user_ids).update_all(:has_active_session => false)
+    delete_stored_sessions_for_users(user_ids)
+  end
+
+  def self.delete_stored_sessions_for_users(user_ids)
+    require 'active_record/session_store/session'
+    ActiveRecord::SessionStore::Session.find_each do |stored_session|
+      data = stored_session.data
+      user_id = data['user'] || data[:user]
+      stored_session.delete if user_ids.include?(user_id.to_i)
+    end
+  rescue LoadError, NameError => e
+    Rails.logger.debug("Skipping AR session wipe (#{e.class}): #{e.message}")
   end
 
   def self.find_or_create_external_user(attrs, auth_source_name)

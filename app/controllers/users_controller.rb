@@ -7,7 +7,8 @@ class UsersController < ApplicationController
 
   rescue_from ActionController::InvalidAuthenticityToken, with: :login_token_reload
   skip_before_action :require_mail, :only => [:edit, :update, :logout, :stop_impersonation]
-  skip_before_action :require_login, :check_user_enabled, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :enforce_password_change_required, :only => [:login, :logout, :extlogout, :captcha_challenge]
+  skip_before_action :require_login, :check_user_enabled, :check_active_session, :authorize, :session_expiry, :update_activity_time, :set_taxonomy, :set_gettext_locale_db, :enforce_password_change_required, :only => [:login, :logout, :extlogout, :captcha_challenge]
+  skip_before_action :check_active_session, :only => :extlogin
   skip_before_action :authorize, :only => [:extlogin, :impersonate, :stop_impersonation, :reauthenticate]
   before_action      :require_admin, :only => :impersonate
   after_action       :update_activity_time, :only => :login
@@ -109,6 +110,7 @@ class UsersController < ApplicationController
     if session[:impersonated_by].blank?
       session[:impersonated_by] = User.current.id
       User.impersonator = User.current
+      user.claim_active_session
       session[:user] = user.id
       success _("You impersonated user %s, to cancel the session, click the impersonation icon in the top bar.") % user.name
       Audit.manual_event!(
@@ -128,6 +130,22 @@ class UsersController < ApplicationController
       info _("You are already impersonating, click the impersonation icon in the top bar before starting a new impersonation.")
       redirect_to users_path
     end
+  end
+
+  def terminate_active_sessions_for_all_users
+    return unless ensure_reauthenticated!('users.terminate_sessions')
+
+    user_ids = User.authorized(:edit_users).where(:has_active_session => true).where.not(:id => User.current.id).ids
+    User.terminate_active_sessions_for(user_ids)
+    Foreman::SecurityEvent.log(
+      event: 'SESSION_TERMINATE_ALL',
+      status: 'SUCCESS',
+      actor: User.current&.login,
+      ip: request.remote_ip,
+      target: "users=#{user_ids.size}",
+      details: 'Terminated active browser sessions for authorized users'
+    )
+    process_success(:success_msg => _('Successfully terminated active sessions for all users.'))
   end
 
   def invalidate_jwt_for_all_users
@@ -171,6 +189,27 @@ class UsersController < ApplicationController
         render :json => {}, :status => :ok
       end
     end
+  end
+
+  def terminate_active_session
+    @user = find_resource(:edit_users)
+    if @user == User.current
+      process_error(:error_msg => _('You cannot terminate your own active session from this action.'))
+      return
+    end
+
+    return unless ensure_reauthenticated!('users.terminate_sessions')
+
+    @user.terminate_active_sessions!
+    Foreman::SecurityEvent.log(
+      event: 'SESSION_TERMINATE',
+      status: 'SUCCESS',
+      actor: User.current&.login,
+      ip: request.remote_ip,
+      target: @user.login,
+      details: 'Terminated active browser session'
+    )
+    process_success(:success_msg => _('Successfully terminated active session for %s.') % @user.login)
   end
 
   def stop_impersonation
@@ -369,6 +408,7 @@ class UsersController < ApplicationController
       nil,
       :auditable_id => user_id
     )
+    logged_out_user&.release_active_session
     Foreman::Reauthentication.clear!(session)
     session[:user] = @user = User.current = nil
     if flash[:success] || flash[:info] || flash[:error]
@@ -480,6 +520,7 @@ class UsersController < ApplicationController
     logger.info("User '#{user.login}' logged in from '#{request.ip}'")
     log_authentication_event('login', user, "User '#{user.login}' logged in")
     session[:user]         = user.id
+    user.claim_active_session
     if Foreman::Reauthentication.marks_login_as_fresh?(user)
       Foreman::Reauthentication.mark_authenticated!(session, user)
     else

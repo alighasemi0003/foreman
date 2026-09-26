@@ -20,6 +20,7 @@ class ApplicationController < ActionController::Base
 
   before_action :load_settings
   before_action :require_login, :check_user_enabled
+  before_action :check_active_session
   before_action :enforce_password_change_required
   before_action :set_gettext_locale_db, :set_gettext_locale
   before_action :session_expiry, :update_activity_time, :unless => proc { |c| c.remote_user_provided? || c.api_request? }

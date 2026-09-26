@@ -41,6 +41,22 @@ module Foreman::Controller::Authentication
     true
   end
 
+  # Tip 3.19 Control #20: reject UI sessions after logout/admin terminate.
+  def check_active_session
+    return true if ignore_api_request?
+    return true unless User.current
+    return true unless User.current.has_attribute?(:has_active_session)
+
+    unless User.unscoped.find_by(:id => User.current.id)&.has_active_session?
+      logger.info("Active session was terminated for #{User.current.login}")
+      backup_session_content { reset_session }
+      inline_warning _('Your session has been terminated.')
+      redirect_to main_app.login_users_path
+      return false
+    end
+    true
+  end
+
   def authorized
     User.current.allowed_to?(path_to_authenticate)
   end
@@ -94,6 +110,7 @@ module Foreman::Controller::Authentication
       set_activity_time
     else
       backup_session_content { reset_session }
+      user.claim_active_session
       session[:user] = user.id
       update_activity_time
     end
