@@ -56,6 +56,14 @@ module LayoutHelper
     }
   end
 
+  # Renders the post-login responsibility modal once per interactive login.
+  # Consumes session[:show_login_responsibility] so ordinary refreshes do not re-show it.
+  def login_responsibility_modal
+    return unless session.delete(:show_login_responsibility)
+
+    render :partial => 'layouts/login_responsibility_modal'
+  end
+
   def title(page_title, page_header = nil)
     content_for(:title, page_title.to_s)
     @page_header ||= page_header || page_title.to_s

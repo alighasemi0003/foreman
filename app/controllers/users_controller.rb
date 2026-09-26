@@ -485,6 +485,8 @@ class UsersController < ApplicationController
     else
       Foreman::Reauthentication.clear!(session)
     end
+    # One-shot interactive login responsibility notice (Control #18). Cleared when rendered.
+    session[:show_login_responsibility] = true
     uri                    = session.to_hash.with_indifferent_access[:original_uri]
     session[:original_uri] = nil
     store_default_taxonomy(user, 'organization') unless session.has_key?(:organization_id)

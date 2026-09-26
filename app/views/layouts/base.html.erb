@@ -59,6 +59,7 @@
       <% cache(TopbarSweeper.fragment_name, :skip_digest => true) do %>
         <%= mount_react_app %>
       <% end %>
+      <%= login_responsibility_modal %>
       <div
         id="rails-app-content"
         class="pf-v5-c-page"

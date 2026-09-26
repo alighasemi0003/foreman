@@ -1,0 +1,47 @@
+<%# One-shot authorized-use notice after interactive browser login (Control #18). %>
+<div id="login-responsibility-modal"
+     class="modal fade"
+     tabindex="-1"
+     role="dialog"
+     aria-labelledby="login-responsibility-title"
+     aria-modal="true"
+     data-backdrop="static"
+     data-keyboard="false">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="login-responsibility-title"><%= _('Authorized use only') %></h4>
+      </div>
+      <div class="modal-body">
+        <p>
+          <%= _('This system is for authorized use only. Activity may be monitored and audited. By continuing, you acknowledge responsibility for actions performed using your account.') %>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="login-responsibility-continue" data-dismiss="modal">
+          <%= _('Continue') %>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  (function () {
+    function showLoginResponsibilityModal() {
+      var el = document.getElementById('login-responsibility-modal');
+      if (!el) return;
+      if (window.jQuery && typeof window.jQuery(el).modal === 'function') {
+        window.jQuery(el).modal('show');
+      } else {
+        el.classList.add('in');
+        el.style.display = 'block';
+        el.setAttribute('aria-hidden', 'false');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', showLoginResponsibilityModal);
+    } else {
+      showLoginResponsibilityModal();
+    }
+  })();
+</script>
