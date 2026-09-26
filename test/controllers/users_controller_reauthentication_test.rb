@@ -19,11 +19,23 @@ class UsersControllerReauthenticationTest < ActionController::TestCase
   end
 
   def stale_session(user = @admin)
+    # Valid browser session under Control #20 (has_active_session), but without a fresh reauth mark.
+    user.claim_active_session if user.respond_to?(:claim_active_session)
     { user: user.id, expires_at: 5.minutes.from_now }
   end
 
   def fresh_session(user = @admin)
     set_session_user(user)
+  end
+
+  def expired_reauth_session(user = @admin)
+    user.claim_active_session if user.respond_to?(:claim_active_session)
+    {
+      user: user.id,
+      reauthenticated_at: 10.minutes.ago.to_i,
+      reauth_actor_id: user.id,
+      expires_at: 5.minutes.from_now,
+    }
   end
 
   test 'normal user field update does not require reauth when stale' do
@@ -76,12 +88,7 @@ class UsersControllerReauthenticationTest < ActionController::TestCase
 
   test 'expired recent auth blocks admin change' do
     put :update, params: { id: @target.id, user: { admin: true } },
-                 session: {
-                   user: @admin.id,
-                   reauthenticated_at: 10.minutes.ago.to_i,
-                   reauth_actor_id: @admin.id,
-                   expires_at: 5.minutes.from_now,
-                 }
+                 session: expired_reauth_session
     assert_response :redirect
     refute @target.reload.admin?
   end
