@@ -45,14 +45,6 @@ module UsersHelper
     end
 
     if user != User.current
-      additional_actions << display_link_if_authorized(_("Invalidate JWTs"),
-        hash_for_invalidate_jwt_user_path(:id => user.id).merge(:auth_object => user, :permission => "edit_users"),
-        :method => :patch, :id => user.id,
-        :data => {
-          :confirm => _("Invalidate all JSON Web Tokens for %s?") % user.name,
-          :foreman_reauth => true,
-        })
-
       if user.disabled?
         additional_actions << display_link_if_authorized(_("Enable"),
           hash_for_user_path(:id => user).merge(:auth_object => user, :permission => "edit_users", :user => { :disabled => false }),
