@@ -1,57 +1,66 @@
-version: '3.4'
+# Local / lab stack for security-hardening-5.0 verification.
+# Not a production deployment. See docs/docker-local.md.
 services:
   db:
     environment:
-      - POSTGRES_USER=foreman
-      - POSTGRES_PASSWORD=foreman
-      - POSTGRES_DATABASE=foreman
+      - POSTGRES_USER=${POSTGRES_USER:-foreman}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-foreman}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE:-foreman}
       - PGDATA=/var/lib/postgresql/data/pgdata
     hostname: db.example.com
     image: postgres:12
     ports:
-      - '5432'
+      # Short form publishes an ephemeral host port (avoids fixed 5432 clashes).
+      - "5432"
     restart: always
     healthcheck:
       # postgres image has pg_isready; it does not ship netcat (nc).
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DATABASE:-$${POSTGRES_DB:-postgres}} -h 127.0.0.1 || exit 1"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     volumes:
       - db:/var/lib/postgresql/data
 
   app: &app_base
     # Local verification image built from this branch (not an official release tag).
-    image: foreman-local:security-hardening-5.0
+    image: ${FOREMAN_IMAGE:-foreman-local:security-hardening-5.0}
     command: bash -lc 'rm -f tmp/pids/server.pid; exec bundle exec bin/rails server -b 0.0.0.0'
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      - DATABASE_URL=postgres://foreman:foreman@db/foreman?pool=5
+      - DATABASE_URL=${DATABASE_URL:-postgres://foreman:foreman@db/foreman?pool=5}
       - RAILS_MAX_THREADS=5
       - RAILS_ENV=production
       # Local compose serves HTTP on :3000 — do not enforce force_ssl here.
       # Production deployments must omit this (defaults to HTTPS) or set FOREMAN_REQUIRE_SSL=true.
-      - FOREMAN_REQUIRE_SSL=false
-      - FOREMAN_FQDN=foreman.example.com
-      - FOREMAN_DOMAIN=example.com
+      - FOREMAN_REQUIRE_SSL=${FOREMAN_REQUIRE_SSL:-false}
+      - FOREMAN_FQDN=${FOREMAN_FQDN:-foreman.example.com}
+      - FOREMAN_DOMAIN=${FOREMAN_DOMAIN:-example.com}
       - FOREMAN_RAILS_CACHE_STORE_TYPE=redis
       - FOREMAN_RAILS_CACHE_STORE_URLS=redis://redis-cache:6379/0
       - DYNFLOW_REDIS_URL=redis://redis-tasks:6379/0
       - REDIS_PROVIDER=DYNFLOW_REDIS_URL
     hostname: foreman.example.com
-    links:
-      - db
-      - redis-cache
-      - redis-tasks
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-tasks:
+        condition: service_started
     ports:
-      - "${MY_DOCKER_IP:-127.0.0.1}:3000:3000"
-      - "${MY_DOCKER_IP:-127.0.0.1}:5910-5930:5910-5930"
+      - "${MY_DOCKER_IP:-127.0.0.1}:${FOREMAN_HTTP_PORT:-3000}:3000"
+      # VNC 5910-5930 is not published by default (avoids multi-project clashes).
+      # To enable: add under ports, or `docker compose --profile vnc` with docker-compose.vnc.yml.
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 3000 || exit 1"]
-      interval: 5m
+      interval: 30s
+      timeout: 5s
+      retries: 10
       start_period: 1m
 
   orchestrator:
@@ -71,6 +80,7 @@ services:
       disable: true
 
   redis-cache:
+    # Floating tag for local lab convenience. Pin (e.g. redis:7) for stricter reproducibility.
     image: redis
     restart: always
 

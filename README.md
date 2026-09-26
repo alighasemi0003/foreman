@@ -22,6 +22,8 @@ Using [Puppet](https://www.theforeman.org/manuals/latest/#4.2ManagingPuppet), [A
 
 Foreman provides comprehensive, interaction facilities including a **web frontend**, [**CLI**](https://theforeman.org/manuals/latest/index.html#4.5CommandLineInterface) and [**RESTful API**](https://theforeman.org/documentation.html) which enables you to build higher level business logic on top of a solid foundation.
 
+For a **local Docker lab / verification** setup on the `security-hardening-5.0` branch, see [docs/docker-local.md](docs/docker-local.md).
+
 Foreman is a mature project, deployed in [many organizations](https://projects.theforeman.org/projects/foreman/wiki/Who_Uses_Foreman), managing from 10s to 10000s of servers. It is used in distributions such as RDO and RHOS (Red Hat OpenStack distribution) and has [an extensive library of plugins](https://projects.theforeman.org/projects/foreman/wiki/List_of_Plugins).
 
 # Features

@@ -44,8 +44,11 @@ custom_plan.rb
 pkg/
 config/hooks
 *.csv
+# Host-installed gem trees — must not enter the image build context
 vendor/ruby
+vendor/bundle
 .env*
+!.env.example
 package-lock.json
 npm-debug.log
 .vscode
@@ -55,4 +58,5 @@ out*
 .dockerignore
 .github/
 docker-compose*.yml
-Gemfile.lock
+# Keep Gemfile.lock in context for deterministic bundle install (Ruby 3.0-compatible graph)
+bundler.d/*.local.rb

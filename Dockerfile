@@ -41,29 +41,41 @@ ENV DATABASE_URL=nulldb://nohost
 ARG HOME=/home/foreman
 USER 1001
 WORKDIR $HOME
-COPY --chown=1001:0 . ${HOME}/
-RUN bundle config set --local without "${BUNDLER_SKIPPED_GROUPS}" && \
+
+# Ruby dependency manifests only — cache this layer across app/source edits
+COPY --chown=1001:0 Gemfile Gemfile.lock ${HOME}/
+COPY --chown=1001:0 bundler.d ${HOME}/bundler.d
+RUN test -f ${HOME}/Gemfile.lock && \
+  bundle config set --local without "${BUNDLER_SKIPPED_GROUPS}" && \
   bundle config set --local clean true && \
   bundle config set --local path vendor && \
   bundle config set --local jobs 5 && \
-  bundle config set --local retry 3
-RUN bundle install && \
+  bundle config set --local retry 3 && \
+  bundle config set --local frozen true && \
+  bundle install && \
   bundle binstubs --all && \
   rm -rf vendor/ruby/*/cache/*.gem && \
   find vendor/ruby/*/gems -name "*.c" -delete && \
   find vendor/ruby/*/gems -name "*.o" -delete
+
+# Application source (invalidates later layers only)
+COPY --chown=1001:0 . ${HOME}/
 RUN \
   make -C locale all-mo && \
   mv -v db/schema.rb.nulldb db/schema.rb && \
   bundle exec rake assets:clean assets:precompile
 
+# npm install needs the full tree (plugin discovery scripts); keep after source COPY.
+# Foreman does not track package-lock.json; keep upstream npm install semantics.
 RUN chmod +x script/npm_install_plugins.js script/plugin_webpack_directories.rb && \
   npm install --no-audit --no-optional && \
   ./node_modules/webpack/bin/webpack.js --config config/webpack.config.js && \
-# cleanups
-  rm -rf public/webpack/stats.json ./node_modules vendor/ruby/*/cache vendor/ruby/*/gems/*/node_modules bundler.d/nulldb.rb db/schema.rb && \
+# cleanups (nulldb.rb must remain: Gemfile.lock lists activerecord-nulldb-adapter;
+# the gem is build/runtime-declared only — adapter selection still follows DATABASE_URL)
+  rm -rf public/webpack/stats.json ./node_modules vendor/ruby/*/cache vendor/ruby/*/gems/*/node_modules && \
   bundle config without "${BUNDLER_SKIPPED_GROUPS} assets" && \
-  bundle install
+  bundle install && \
+  rm -f db/schema.rb
 
 USER 0
 RUN chgrp -R 0 ${HOME} && \
@@ -86,7 +98,7 @@ COPY --from=builder --chown=1001:0 ${HOME}/.bundle/config ${HOME}/.bundle/config
 COPY --from=builder --chown=1001:0 ${HOME}/Gemfile.lock ${HOME}/Gemfile.lock
 COPY --from=builder --chown=1001:0 ${HOME}/vendor/ruby ${HOME}/vendor/ruby
 COPY --from=builder --chown=1001:0 ${HOME}/public ${HOME}/public
-RUN rm -rf bundler.d/nulldb.rb bin/spring
+RUN rm -rf bin/spring
 RUN chmod +x bin/* script/npm_install_plugins.js script/plugin_webpack_directories.rb || true
 
 RUN date -u > BUILD_TIME

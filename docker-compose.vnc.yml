@@ -1,0 +1,7 @@
+# Optional: publish VNC console ports for the local lab stack.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.vnc.yml up -d app
+services:
+  app:
+    ports:
+      - "${MY_DOCKER_IP:-127.0.0.1}:5910-5930:5910-5930"

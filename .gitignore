@@ -14,7 +14,7 @@ config/settings.plugins.d
 config/database.yml
 config/initializers/local_secret_token.rb
 config/initializers/encryption_key.rb
-Gemfile.lock
+# Gemfile.lock is tracked for deterministic Docker/Ruby installs on this branch
 bundler.d/*.local.rb
 *.sw?
 .idea
@@ -48,6 +48,7 @@ vendor/bundle
 vendor/ruby
 public/webpack
 .env*
+!.env.example
 package-lock.json
 npm-debug.log
 .vscode
