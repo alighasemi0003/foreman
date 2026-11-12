@@ -19,8 +19,10 @@ RUN groupadd -r foreman -f -g 0 && \
     chmod -R g=u ${HOME}
 
 # Add a script to be executed every time the container starts.
+# F-021 pre-start cleaner loads lib from $FOREMAN_APP_ROOT/lib at runtime.
 COPY extras/containers/entrypoint.sh /usr/bin/
-RUN chmod +x /usr/bin/entrypoint.sh
+COPY extras/containers/safe_clean_runtime_state.rb /usr/bin/
+RUN chmod +x /usr/bin/entrypoint.sh /usr/bin/safe_clean_runtime_state.rb
 ENTRYPOINT ["entrypoint.sh"]
 
 # Temp container that download gems/npms and compile assets etc
@@ -97,6 +99,7 @@ USER 1001
 WORKDIR ${HOME}
 COPY --chown=1001:0 . ${HOME}/
 COPY --from=builder /usr/bin/entrypoint.sh /usr/bin/entrypoint.sh
+COPY --from=builder /usr/bin/safe_clean_runtime_state.rb /usr/bin/safe_clean_runtime_state.rb
 COPY --from=builder --chown=1001:0 ${HOME}/.bundle/config ${HOME}/.bundle/config
 COPY --from=builder --chown=1001:0 ${HOME}/Gemfile.lock ${HOME}/Gemfile.lock
 COPY --from=builder --chown=1001:0 ${HOME}/vendor/ruby ${HOME}/vendor/ruby

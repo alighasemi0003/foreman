@@ -33,7 +33,7 @@ FileStore remains the **fallback** when Redis is not configured
 | Request / provision tempfiles | `Rails.root/tmp/<Tempfile>` | App | Request / orchestration step | Yes (finish templates, CA PEM) | Explicit `close!` / `Tempfile.create`; orphan age ≥1h |
 | Regenerable FileStore cache | `tmp/cache/` | Rails FileStore | Default `expires_in` 12h | Generally non-secret UI/API cache; treat as regenerable | `Rails.cache.cleanup` + hard age 7d |
 | Redis application cache | redis-cache DB | Rails RedisCacheStore | Per-key `expires_in` | Rate-limit counters, facts snippets, etc. | Writer TTL only — **no FLUSH** |
-| Runtime PID / sockets / puma.state | `tmp/pids`, `tmp/sockets`, `puma.state` | Puma | Process lifetime | Low | **F-021** — preserved by F-020 |
+| Runtime PID / sockets / puma.state | `tmp/pids`, `tmp/sockets`, `puma.state` | Puma | Process lifetime | Low | **F-021** (`docs/runtime-state-lifecycle.md`) — preserved by F-020 |
 | Secret token file | `tmp/secret_token` | App boot | Persistent across restart | Yes | **Never deleted** by F-020 |
 | Logs / audits | `log/`, DB audits, collector | Logging | Policy-specific | Yes | Untouched |
 | Business data | PostgreSQL | App | Persistent | Yes | Untouched |

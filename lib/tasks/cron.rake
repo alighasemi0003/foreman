@@ -9,6 +9,7 @@ Foreman::Cron.register(:daily,  'db:sessions:clear')
 Foreman::Cron.register(:daily,  'reports:expire')
 Foreman::Cron.register(:daily,  'audits:expire')
 Foreman::Cron.register(:daily,  'tmp:cache_lifecycle')
+Foreman::Cron.register(:daily,  'tmp:runtime_state')
 
 Foreman::Cron.register(:weekly, 'reports:weekly')
 Foreman::Cron.register(:weekly, 'notifications:clean')

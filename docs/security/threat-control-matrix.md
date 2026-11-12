@@ -72,6 +72,7 @@
 | CTL-019 | JWT invalidation enforcement | Custom | `jwt_invalidation_enforcement_test.rb` | — |
 | CTL-020 | Export/ENC sensitive data redaction | Custom | `docs/export-sensitive-data.md` | F-019 |
 | CTL-054 | Temporary file and cache lifecycle | Custom | `docs/temp-cache-lifecycle.md` | F-020 |
+| CTL-054b | Runtime PID/state/socket lifecycle | Custom | `docs/runtime-state-lifecycle.md` | F-021 |
 | CTL-021 | Userdata MAC requires IP/token binding | Custom | `userdata_controller.rb` | F-012 |
 | CTL-022 | Unattended HostFinder token/IP | Native+Custom | `unattended_controller.rb` | — |
 | CTL-023 | Key-pair export reauth + passphrase POST | Custom | `key_pairs_controller.rb` | F-018 |

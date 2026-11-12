@@ -1,8 +1,14 @@
 run_dir = Rails.root.join('tmp')
+require 'fileutils'
+require 'foreman/runtime_state_lifecycle'
 
-# Store server info state.
+# F-021: restrictive runtime dirs for PID / control socket / state.
+Foreman::RuntimeStateLifecycle.ensure_runtime_directories!(run_dir)
+
+# Store server info state (mode applied by Puma; re-hardened on_booted).
 state_path File.join(run_dir, 'puma.state')
 state_permission 0o0640
+pidfile File.join(run_dir, 'pids', 'server.pid')
 
 # Configure "min" to be the minimum number of threads to use to answer
 # requests and "max" the maximum.
@@ -69,7 +75,12 @@ on_worker_boot do
 end
 
 # === Puma control rack application ===
+# Socket lives under tmp/sockets (0700/0750 dir). Mode tightened in on_booted (F-021).
 activate_control_app "unix://#{run_dir}/sockets/pumactl.sock"
+
+on_booted do
+  Foreman::RuntimeStateLifecycle.harden_permissions!(run_dir)
+end
 
 # Loading and initializing of all gettext languages takes about 100ms per language
 # in development environment and little less on production. Let's eager load languages

@@ -26,7 +26,10 @@ services:
   app: &app_base
     # Local verification image built from this branch (not an official release tag).
     image: ${FOREMAN_IMAGE:-foreman-local:security-hardening-5.0}
-    command: bash -lc 'rm -f tmp/pids/server.pid; exec bundle exec bin/rails server -b 0.0.0.0'
+    # Entrypoint runs F-021 safe stale PID/socket cleanup; do not blind-rm here.
+    # Default stop signal is SIGTERM; give Puma time to release state/sockets.
+    stop_grace_period: 30s
+    command: bash -lc 'exec bundle exec bin/rails server -b 0.0.0.0'
     build:
       context: .
       dockerfile: Dockerfile

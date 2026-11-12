@@ -8,11 +8,20 @@ Requires=foreman.socket
 Type=notify
 User=foreman
 TimeoutSec=300
+# Isolates /tmp for the service. PID/state under WorkingDirectory/tmp are
+# cleaned by ExecStartPre (F-021). See extras/systemd/foreman-tmpfiles.conf
+# when mapping runtime dirs to /run/foreman.
 PrivateTmp=true
 WorkingDirectory=/usr/share/foreman
+# Safe stale PID/socket/state cleanup — liveness-checked; does not kill processes.
+ExecStartPre=-/usr/bin/ruby /usr/share/foreman/extras/containers/safe_clean_runtime_state.rb /usr/share/foreman
 ExecStart=/usr/share/foreman/bin/rails server --environment $FOREMAN_ENV
+# Graceful stop: Puma releases pumactl.sock / puma.state / pidfile on SIGTERM.
+TimeoutStopSec=30
+KillMode=mixed
 Environment=FOREMAN_ENV=production
 Environment=MALLOC_ARENA_MAX=2
+Environment=FOREMAN_APP_ROOT=/usr/share/foreman
 
 SyslogIdentifier=foreman
 
