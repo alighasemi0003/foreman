@@ -151,6 +151,14 @@ Foreman::SettingManager.define(:foreman) do
     validates('password_max_age',
       ->(value) { value.to_i.between?(0, 3650) },
       message: N_("must be between 0 and 3650 (0 disables expiration)"))
+    setting('password_history_length',
+      type: :integer,
+      description: N_("Number of previous locally managed passwords that cannot be reused. The current password is always rejected separately. Set to 0 to disable historical reuse checking. Does not apply to LDAP or external authentication providers."),
+      default: 5,
+      full_name: N_('Password history length'))
+    validates('password_history_length',
+      ->(value) { value.to_i.between?(0, 24) },
+      message: N_("must be between 0 and 24 (0 disables historical reuse checking)"))
     setting('password_hash',
       type: :string,
       description: N_("Password hashing algorithm. A password change is needed effect existing passwords."),

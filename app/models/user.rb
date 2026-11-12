@@ -20,6 +20,7 @@ class User < ApplicationRecord
   include UserAccountLockout
   include UserPasswordComplexity
   include UserPasswordExpiration
+  include UserPasswordHistoryPolicy
   include Foreman::ObservableModel
 
   ANONYMOUS_ADMIN = 'foreman_admin'
