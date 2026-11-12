@@ -1,0 +1,19 @@
+# F-037 — time-limited vulnerability exceptions
+# Each entry must justify residual risk. Expired entries do NOT bypass the gate.
+# See docs/security/dependency-scanning.md
+
+version: 1
+exceptions: []
+
+# Example (inactive — do not copy without review):
+# exceptions:
+#   - id: CVE-2024-XXXXX
+#     package: example-gem
+#     ecosystem: ruby   # ruby | npm | image
+#     reason: "No compatible fixed release for Rails 7.0 pin; tracked as F-XXX"
+#     scope: "CI/runtime Gemfile.lock production groups"
+#     impact: "Requires authenticated admin; mitigated by network controls"
+#     mitigation: "WAF/rate limits; upgrade planned after Rails minor bump"
+#     reviewer_role: "Security Team (proposed)"
+#     expires_on: "2026-06-01"
+#     status: accepted

@@ -1,0 +1,194 @@
+name: Dependency & container security
+
+# F-037 — SCA for Ruby gems, npm production deps, and (when built) the app image.
+on:
+  pull_request:
+  push:
+    branches:
+      - 'develop'
+      - '*-stable'
+      - 'security-hardening-5.0'
+  schedule:
+    # Refresh advisory DBs regularly even without code pushes.
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.ref_name }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  BUNDLER_AUDIT_VERSION: "0.9.2"
+  TRIVY_VERSION: "0.58.1"
+
+jobs:
+  gate_unit_tests:
+    name: Security gate unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PyYAML
+        run: pip install "pyyaml==6.0.2"
+      - name: Run gate policy tests
+        run: |
+          python test/security/test_apply_security_gate.py -v
+          python test/security/test_normalize_reports.py -v
+
+  ruby_npm_scan:
+    name: Ruby + npm advisory scan
+    runs-on: ubuntu-24.04
+    needs: gate_unit_tests
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.1"
+          bundler-cache: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: |
+          gem install bundler-audit -v "${BUNDLER_AUDIT_VERSION}" --no-document
+          pip install "pyyaml==6.0.2"
+
+      - name: Update Ruby advisory DB
+        run: bundle-audit update
+
+      - name: bundler-audit check
+        id: bundler_audit
+        continue-on-error: true
+        run: |
+          mkdir -p tmp/security-scan
+          set +e
+          bundle-audit check --format json > tmp/security-scan/bundler-audit.raw.json 2> tmp/security-scan/bundler-audit.stderr
+          echo "ba_exit=$?" >> "$GITHUB_OUTPUT"
+          if [ ! -s tmp/security-scan/bundler-audit.raw.json ]; then
+            python - <<'PY'
+          import json, pathlib
+          err = pathlib.Path("tmp/security-scan/bundler-audit.stderr").read_text()[:500]
+          pathlib.Path("tmp/security-scan/bundler-audit.raw.json").write_text(
+              json.dumps({"scanner_error": f"bundler-audit produced no JSON: {err}"})
+          )
+          PY
+          fi
+
+      - name: npm audit (production / omit=dev)
+        id: npm_audit
+        continue-on-error: true
+        run: |
+          set +e
+          npm audit --omit=dev --json > tmp/security-scan/npm-audit.raw.json 2> tmp/security-scan/npm-audit.stderr
+          echo "npm_exit=$?" >> "$GITHUB_OUTPUT"
+          if ! python -c 'import json; json.load(open("tmp/security-scan/npm-audit.raw.json"))'; then
+            echo '{"scanner_error":"npm audit returned non-JSON"}' > tmp/security-scan/npm-audit.raw.json
+          fi
+          npm audit --json > tmp/security-scan/npm-audit-full.raw.json || true
+
+      - name: Normalize reports
+        run: |
+          python script/security/normalize_reports.py --kind bundler-audit \
+            --input tmp/security-scan/bundler-audit.raw.json \
+            --output tmp/security-scan/ruby.normalized.json
+          python script/security/normalize_reports.py --kind npm \
+            --input tmp/security-scan/npm-audit.raw.json \
+            --output tmp/security-scan/npm.normalized.json
+
+      - name: Apply security gate (Ruby + npm)
+        run: |
+          python script/security/apply_security_gate.py \
+            --policy config/security/scan-policy.yml \
+            --exceptions config/security/exceptions.yml \
+            --report tmp/security-scan/ruby.normalized.json \
+            --report tmp/security-scan/npm.normalized.json
+
+      - name: Upload scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-security-reports
+          path: tmp/security-scan/
+          if-no-files-found: warn
+
+  image_scan:
+    name: Container image scan (Trivy)
+    runs-on: ubuntu-24.04
+    needs: gate_unit_tests
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: pip install "pyyaml==6.0.2"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build local image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: foreman:security-scan
+          # Cache for speed; advisory freshness comes from Trivy DB, not layer cache.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        env:
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db
+        with:
+          image-ref: foreman:security-scan
+          format: json
+          output: tmp/security-scan/trivy.raw.json
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+          exit-code: "0"
+          scanners: vuln
+          cache-dir: .trivycache/
+
+      - name: Fail if Trivy report missing
+        run: |
+          mkdir -p tmp/security-scan
+          if [ ! -s tmp/security-scan/trivy.raw.json ]; then
+            echo '{"scanner_error":"trivy report missing"}' > tmp/security-scan/trivy.raw.json
+            exit 2
+          fi
+
+      - name: Normalize + gate (image)
+        run: |
+          python script/security/normalize_reports.py --kind trivy \
+            --input tmp/security-scan/trivy.raw.json \
+            --output tmp/security-scan/image.normalized.json
+          python script/security/apply_security_gate.py \
+            --policy config/security/scan-policy.yml \
+            --exceptions config/security/exceptions.yml \
+            --report tmp/security-scan/image.normalized.json
+
+      - name: Upload image scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-security-reports
+          path: tmp/security-scan/
+          if-no-files-found: warn
