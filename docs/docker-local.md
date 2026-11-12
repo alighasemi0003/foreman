@@ -167,3 +167,8 @@ COMPOSE_PROJECT_NAME=foreman-handoff docker compose --env-file .env.handoff down
 
 - **Portable local / lab stack:** yes (after Gemfile.lock + Docker freeze commits are on the branch)
 - **Production-ready:** no
+
+For production installation and hardening guidance (Requirement 84), see
+[`docs/security/production-hardening-runbook.md`](security/production-hardening-runbook.md).
+That runbook documents production requirements separately from this lab stack and
+does **not** claim that production deployment has been performed.

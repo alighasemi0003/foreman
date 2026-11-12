@@ -8,6 +8,7 @@
 | Audit requirement | 70 |
 | Method | STRIDE on verified data flows |
 | Diagrams | [diagrams/foreman-dfd.md](diagrams/foreman-dfd.md) |
+| Production hardening runbook | [production-hardening-runbook.md](production-hardening-runbook.md) (F-045) |
 
 ## 1. Scope and assumptions
 
