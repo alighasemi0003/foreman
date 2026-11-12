@@ -472,17 +472,27 @@ class User < ApplicationRecord
   end
 
   def upgrade_password(pass)
-    logger.info "Upgrading password for user #{login} to configured algorithm"
-    self.password_salt = salt_password
-    self.password_hash = hash_password(pass)
+    target = Foreman::PasswordHash.algorithm_for_new_passwords
+    logger.info "Upgrading password for user #{login} to #{target}"
+    self.password_salt = salt_password(target)
+    self.password_hash = hash_password(pass, target)
+    # update_columns bypasses validations/callbacks — intentional so a same-secret
+    # rehash does not append password history (F-009 / F-022).
     update_columns(password_salt: password_salt, password_hash: password_hash)
   end
 
   def matching_password?(pass)
     return false if password_hash.nil? || pass.nil?
     type = Foreman::PasswordHash.detect_implementation(password_salt)
-    return false if password_hash != hash_password(pass, type)
-    upgrade_password(pass) if type != Setting[:password_hash]&.to_sym
+    begin
+      computed = hash_password(pass, type)
+    rescue StandardError
+      return false
+    end
+    return false if computed.blank? || computed.bytesize != password_hash.bytesize
+    return false unless ActiveSupport::SecurityUtils.secure_compare(computed, password_hash)
+
+    upgrade_password(pass) if Foreman::PasswordHash.needs_rehash?(type, password_salt)
     true
   end
 
@@ -749,12 +759,12 @@ class User < ApplicationRecord
     MailNotification[:welcome].deliver(:user => self)
   end
 
-  def salt_password(type = Setting[:password_hash])
+  def salt_password(type = Foreman::PasswordHash.algorithm_for_new_passwords)
     hasher = Foreman::PasswordHash.new(type)
     hasher.generate_salt
   end
 
-  def hash_password(pass, type = Setting[:password_hash])
+  def hash_password(pass, type = Foreman::PasswordHash.algorithm_for_new_passwords)
     telemetry_duration_histogram(:login_pwhash_duration, :ms, algorithm: type) do
       hasher = Foreman::PasswordHash.new(type)
       hasher.hash_secret(pass, password_salt)
@@ -794,7 +804,13 @@ class User < ApplicationRecord
   # Compares against the stored hash with the current salt — never logs plaintext.
   def ensure_new_password_differs_from_current
     type = Foreman::PasswordHash.detect_implementation(password_salt)
-    return unless password_hash == hash_password(password, type)
+    begin
+      computed = hash_password(password, type)
+    rescue StandardError
+      return
+    end
+    return if computed.blank? || computed.bytesize != password_hash.bytesize
+    return unless ActiveSupport::SecurityUtils.secure_compare(computed, password_hash)
 
     errors.add(:password, _("The new password must be different from the current password."))
   end

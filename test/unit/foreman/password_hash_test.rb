@@ -58,4 +58,27 @@ class PasswordHashTest < ActiveSupport::TestCase
     assert_equal h1, hasher.hash_secret('test', hasher.calculate_salt('test', 100))
     assert_equal h2, hasher.hash_secret('test', hasher.calculate_salt('test', 200))
   end
+
+  test "approved_for_new? allows bcrypt and pbkdf2sha1 only" do
+    assert Foreman::PasswordHash.approved_for_new?(:bcrypt)
+    assert Foreman::PasswordHash.approved_for_new?(:pbkdf2sha1)
+    refute Foreman::PasswordHash.approved_for_new?(:sha1)
+    refute Foreman::PasswordHash.approved_for_new?(nil)
+  end
+
+  test "algorithm_for_new_passwords falls back from sha1 to bcrypt" do
+    # Setting validation rejects storing sha1; stub the read path.
+    Setting.stubs(:[]).with(:password_hash).returns('sha1')
+    assert_equal :bcrypt, Foreman::PasswordHash.algorithm_for_new_passwords
+  end
+
+  test "needs_rehash? detects algorithm and work-factor drift" do
+    Setting[:password_hash] = 'bcrypt'
+    Setting[:bcrypt_cost] = 10
+    assert Foreman::PasswordHash.needs_rehash?(:sha1, 'abc')
+    assert Foreman::PasswordHash.needs_rehash?(:bcrypt, '$2a$04$a94a8fe5ccb19ba61c4c0873d391e987982fbbd3')
+    refute Foreman::PasswordHash.needs_rehash?(:bcrypt, '$2a$10$a94a8fe5ccb19ba61c4c0873d391e987982fbbd3')
+  ensure
+    Setting[:bcrypt_cost] = 10
+  end
 end

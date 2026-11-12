@@ -1046,13 +1046,14 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "#matching_password? succeeds if password matches with higher cost" do
-    user = FactoryBot.build_stubbed(:user)
+    user = FactoryBot.create(:user, :password => 'Password1!', :password_confirmation => 'Password1!')
     hasher = Foreman::PasswordHash.new(:sha1)
-    user.password_salt = hasher.generate_salt(10)
-    user.password_hash = hasher.hash_secret('Password1!', user.password_salt)
-    assert_valid user
+    salt = hasher.generate_salt
+    user.update_columns(password_salt: salt, password_hash: hasher.hash_secret('Password1!', salt))
     Setting[:bcrypt_cost] = 15
-    assert user.matching_password?('Password1!')
+    assert user.reload.matching_password?('Password1!')
+    assert_equal :bcrypt, Foreman::PasswordHash.detect_implementation(user.reload.password_salt)
+    assert_operator Foreman::PasswordHash.extract_bcrypt_cost(user.password_salt), :>=, 15
   ensure
     Setting[:bcrypt_cost] = 10
   end
@@ -1073,12 +1074,92 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "#matching_password? does not upgrade for no reason" do
+    Setting[:password_hash] = 'bcrypt'
+    Setting[:bcrypt_cost] = 5
     hasher = Foreman::PasswordHash.new(:bcrypt)
     u = FactoryBot.build_stubbed(:user)
     u.password_salt = hasher.generate_salt(5)
     u.password_hash = hasher.hash_secret('password', u.password_salt)
     u.expects(:upgrade_password).never
     assert u.matching_password?('password')
+  ensure
+    Setting[:bcrypt_cost] = 10
+  end
+
+  test "#matching_password? does not upgrade on failed verify" do
+    hasher = Foreman::PasswordHash.new(:sha1)
+    u = FactoryBot.build_stubbed(:user)
+    u.password_salt = hasher.generate_salt
+    u.password_hash = hasher.hash_secret('Password1!', u.password_salt)
+    u.expects(:upgrade_password).never
+    refute u.matching_password?('wrong-password')
+  end
+
+  test "#matching_password? upgrades when bcrypt cost is below policy" do
+    Setting[:password_hash] = 'bcrypt'
+    Setting[:bcrypt_cost] = 8
+    hasher = Foreman::PasswordHash.new(:bcrypt)
+    u = FactoryBot.create(:user, :password => 'Password1!', :password_confirmation => 'Password1!')
+    low_salt = hasher.generate_salt(4)
+    low_hash = hasher.hash_secret('Password1!', low_salt)
+    u.update_columns(password_salt: low_salt, password_hash: low_hash)
+    assert u.reload.matching_password?('Password1!')
+    assert_operator Foreman::PasswordHash.extract_bcrypt_cost(u.reload.password_salt), :>=, 8
+    assert_equal :bcrypt, Foreman::PasswordHash.detect_implementation(u.password_salt)
+  ensure
+    Setting[:bcrypt_cost] = 10
+  end
+
+  test "#upgrade_password does not append password history" do
+    Setting[:password_history_length] = 5
+    Setting[:password_hash] = 'bcrypt'
+    u = FactoryBot.create(:user, :password => 'Password1!', :password_confirmation => 'Password1!')
+    before = u.password_histories.count
+    hasher = Foreman::PasswordHash.new(:sha1)
+    salt = hasher.generate_salt
+    u.update_columns(password_salt: salt, password_hash: hasher.hash_secret('Password1!', salt))
+    assert u.reload.matching_password?('Password1!')
+    assert_equal before, u.password_histories.count
+    assert_equal :bcrypt, Foreman::PasswordHash.detect_implementation(u.reload.password_salt)
+  end
+
+  test "new passwords are stored with approved bcrypt scheme" do
+    Setting[:password_hash] = 'bcrypt'
+    u = FactoryBot.create(:user, :password => 'Password1!', :password_confirmation => 'Password1!')
+    assert_equal :bcrypt, Foreman::PasswordHash.detect_implementation(u.password_salt)
+    assert u.matching_password?('Password1!')
+  end
+
+  test "legacy sha1 passwords verify and upgrade without history row" do
+    Setting[:password_hash] = 'bcrypt'
+    Setting[:password_history_length] = 5
+    u = FactoryBot.create(:user, :password => 'Password1!', :password_confirmation => 'Password1!')
+    history_before = u.password_histories.count
+    hasher = Foreman::PasswordHash.new(:sha1)
+    salt = hasher.generate_salt
+    u.update_columns(password_salt: salt, password_hash: hasher.hash_secret('Password1!', salt))
+    assert_equal :sha1, Foreman::PasswordHash.detect_implementation(u.reload.password_salt)
+    assert u.matching_password?('Password1!')
+    assert_equal :bcrypt, Foreman::PasswordHash.detect_implementation(u.reload.password_salt)
+    assert_equal history_before, u.password_histories.count
+    refute u.matching_password?('WrongPassword1!')
+  end
+
+  test "historic sha1 password still blocks reuse via history" do
+    Setting[:password_hash] = 'bcrypt'
+    Setting[:password_history_length] = 5
+    u = FactoryBot.create(:user, :password => 'Password1!', :password_confirmation => 'Password1!')
+    hasher = Foreman::PasswordHash.new(:sha1)
+    old_salt = hasher.generate_salt
+    old_hash = hasher.hash_secret('OldLegacy1!', old_salt)
+    u.password_histories.create!(password_hash: old_hash, password_salt: old_salt, created_at: Time.now.utc)
+    as_user u do
+      u.current_password = 'Password1!'
+      u.password = 'OldLegacy1!'
+      u.password_confirmation = 'OldLegacy1!'
+      refute u.valid?
+      assert_includes u.errors[:password], 'The new password cannot match a recently used password.'
+    end
   end
 
   test ".except_hidden doesn't return any hidden users" do

@@ -161,18 +161,21 @@ Foreman::SettingManager.define(:foreman) do
       message: N_("must be between 0 and 24 (0 disables historical reuse checking)"))
     setting('password_hash',
       type: :string,
-      description: N_("Password hashing algorithm. A password change is needed effect existing passwords."),
+      description: N_("Password hashing algorithm for new and upgraded local passwords (bcrypt recommended; PBKDF2-HMAC-SHA1 allowed). Legacy raw SHA-1 hashes still verify and are upgraded on successful login. A password change or login is needed to rehash existing passwords."),
       default: 'bcrypt',
       full_name: N_('Password hashing algorithm'),
-      collection: proc { { 'sha1' => _("SHA1"), 'bcrypt' => _("BCrypt"), 'pbkdf2sha1' => _("PBKDF2 SHA1") } })
+      collection: proc { { 'bcrypt' => _("BCrypt"), 'pbkdf2sha1' => _("PBKDF2 SHA1") } })
+    validates('password_hash',
+      ->(value) { %w[bcrypt pbkdf2sha1].include?(value.to_s) },
+      message: N_("must be bcrypt or pbkdf2sha1 (raw SHA-1 is legacy-verify only)"))
     setting('bcrypt_cost',
       type: :integer,
-      description: N_("Cost value of bcrypt password hash function for internal auth-sources (4-30). A higher value is safer but verification is slower, particularly for stateless API calls and UI logins. A password change is needed effect existing passwords."),
-      default: 4,
+      description: N_("Cost value of bcrypt password hash function for internal auth-sources (4-30). A higher value is safer but verification is slower, particularly for stateless API calls and UI logins. Existing passwords are rehashed on next successful login when below this cost."),
+      default: 10,
       full_name: N_('BCrypt password cost'))
     setting('pbkdf2_cost',
       type: :integer,
-      description: N_("Cost value of PBKDF2 password hash function for internal auth-sources. A higher value is safer but verification is slower, particularly for stateless API calls and UI logins. A password change is needed effect existing passwords."),
+      description: N_("Cost value of PBKDF2 password hash function for internal auth-sources. A higher value is safer but verification is slower, particularly for stateless API calls and UI logins. Existing PBKDF2 passwords are rehashed on next successful login when below this cost."),
       default: 50000,
       full_name: N_('PBKDF2 password cost'))
     setting('bmc_credentials_accessible',

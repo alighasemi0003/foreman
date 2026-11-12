@@ -37,19 +37,19 @@ class PersonalAccessToken < ApplicationRecord
   end
 
   # static salt based on user id because input is already good enough (sha1 string)
-  def self.token_salt(user, type = Setting[:password_hash])
+  def self.token_salt(user, type = Foreman::PasswordHash.algorithm_for_new_passwords)
     hasher = Foreman::PasswordHash.new(type)
     hasher.calculate_salt(user.id)
   end
 
-  def self.hash_token(user, token, type = Setting[:password_hash])
+  def self.hash_token(user, token, type = Foreman::PasswordHash.algorithm_for_new_passwords)
     telemetry_duration_histogram(:login_pwhash_duration, :ms, algorithm: type) do
       hasher = Foreman::PasswordHash.new(type)
       hasher.hash_secret(token, token_salt(user, type))
     end
   end
 
-  def generate_token(type = Setting[:password_hash])
+  def generate_token(type = Foreman::PasswordHash.algorithm_for_new_passwords)
     self.token_value = SecureRandom.urlsafe_base64(nil, false)
     self.token = self.class.hash_token(user, token_value, type)
     token_value

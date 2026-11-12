@@ -1,14 +1,20 @@
 require 'active_support/core_ext/module/delegation'
 
 #
-# Generic-purpose password hasher with two implementations: BCrypt and SHA1.
+# Generic-purpose password hasher with three implementations: BCrypt, PBKDF2-HMAC-SHA1,
+# and legacy raw SHA1 (verify / history only).
 #
 # generate_salt(cost) - generates random salt of optional cost (1-30)
 # calculate_salt(object, cost) - calculates hash from given object (useful for tokens)
 # hash_secret(password, salt) - returns hash from secret and salt
 #
+# F-022: new local passwords must use an approved algorithm (bcrypt or pbkdf2sha1).
+# Raw SHA1 remains available only for verifying and migrating legacy material.
+#
 module Foreman
   class PasswordHash
+    APPROVED_FOR_NEW = %i[bcrypt pbkdf2sha1].freeze
+
     class PBKDF2Implementation
       DEFAULT_SALT_LENGTH = 39
 
@@ -45,6 +51,8 @@ module Foreman
       end
     end
 
+    # Legacy raw SHA-1 (single round). Kept solely for verification and progressive
+    # upgrade of historical records — never for new password storage.
     class SHA1Implementation
       def generate_salt(_cost = nil)
         Digest::SHA1.hexdigest([Time.now.utc, rand].join)
@@ -59,7 +67,7 @@ module Foreman
       end
     end
 
-    def initialize(implementation = Setting[:password_hash])
+    def initialize(implementation = self.class.algorithm_for_new_passwords)
       case implementation&.to_sym
       when :pbkdf2sha1
         @implementation = PBKDF2Implementation.new
@@ -75,13 +83,59 @@ module Foreman
     end
 
     def self.detect_implementation(password_string)
-      if password_string.start_with?('$pbkdf2sha1')
+      if password_string.to_s.start_with?('$pbkdf2sha1')
         :pbkdf2sha1
-      elsif password_string.start_with?('$2')
+      elsif password_string.to_s.start_with?('$2')
         :bcrypt
       else
         :sha1
       end
+    end
+
+    def self.approved_for_new?(implementation)
+      APPROVED_FOR_NEW.include?(implementation&.to_sym)
+    end
+
+    # Algorithm used when creating or upgrading stored password material.
+    # Falls back to bcrypt if the setting is missing or legacy :sha1.
+    def self.algorithm_for_new_passwords
+      configured = Setting[:password_hash]&.to_sym
+      return configured if approved_for_new?(configured)
+
+      if configured.present? && configured != :bcrypt
+        Rails.logger.warn(
+          "password_hash=#{configured} is not approved for new passwords; using bcrypt"
+        )
+      end
+      :bcrypt
+    end
+
+    # True when the stored hash should be rewritten after a successful verify.
+    def self.needs_rehash?(detected_type, salt)
+      configured = algorithm_for_new_passwords
+      detected = detected_type&.to_sym
+      return true if detected != configured
+
+      case configured
+      when :bcrypt
+        extract_bcrypt_cost(salt) < Setting[:bcrypt_cost].to_i
+      when :pbkdf2sha1
+        extract_pbkdf2_cost(salt) < Setting[:pbkdf2_cost].to_i
+      else
+        false
+      end
+    end
+
+    def self.extract_bcrypt_cost(salt)
+      # $2a$10$...
+      match = salt.to_s.match(/\A\$2[aby]?\$(\d{2})\$/)
+      match ? match[1].to_i : 0
+    end
+
+    def self.extract_pbkdf2_cost(salt)
+      # $pbkdf2sha1$50000$...
+      parts = salt.to_s.split('$', 4)
+      parts.length >= 3 ? parts[2].to_i : 0
     end
 
     delegate :generate_salt, :calculate_salt, :hash_secret, to: :implementation
