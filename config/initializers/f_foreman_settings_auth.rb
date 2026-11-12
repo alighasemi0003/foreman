@@ -138,6 +138,11 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Log out idle users after a certain number of minutes"),
       default: 60,
       full_name: N_('Idle timeout'))
+    setting('login_history_limit',
+      type: :integer,
+      description: N_("Maximum number of successful interactive login history records retained per user (1-100). Older entries are removed after each new login."),
+      default: 20,
+      full_name: N_('Login history limit'))
     setting('password_hash',
       type: :string,
       description: N_("Password hashing algorithm. A password change is needed effect existing passwords."),

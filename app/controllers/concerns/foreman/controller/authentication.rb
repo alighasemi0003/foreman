@@ -113,7 +113,26 @@ module Foreman::Controller::Authentication
       user.claim_active_session
       session[:user] = user.id
       update_activity_time
+      # First UI SSO session establishment (not form login_user, not API/PAT).
+      record_sso_login_history!(user)
     end
     user.present?
+  end
+
+  def record_sso_login_history!(user)
+    # users#login / users#extlogin record via login_user to avoid duplicates.
+    return if is_a?(UsersController) && %w[login extlogin].include?(action_name)
+
+    UserLoginEvent.record_successful_login!(
+      user: user,
+      remote_ip: request.remote_ip,
+      request_host: request.host,
+      auth_method: 'sso',
+      auth_source_name: user.auth_source&.name
+    )
+  rescue StandardError => e
+    # Match Audit posture for interactive login: surface failure, do not hide it.
+    Foreman::Logging.exception('Failed to record SSO login history', e)
+    raise
   end
 end

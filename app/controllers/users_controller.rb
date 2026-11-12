@@ -378,11 +378,11 @@ class UsersController < ApplicationController
   end
 
   def extlogin
-    if session[:user]
+      if session[:user]
       session.delete('organization_id')
       session.delete('location_id')
       user = User.find_by_id(session[:user])
-      login_user(user)
+      login_user(user, auth_method: 'external')
       user.post_successful_login
     end
   end
@@ -516,9 +516,10 @@ class UsersController < ApplicationController
     )
   end
 
-  def login_user(user)
-    logger.info("User '#{user.login}' logged in from '#{request.ip}'")
+  def login_user(user, auth_method: nil)
+    logger.info("User '#{user.login}' logged in from '#{request.remote_ip}'")
     log_authentication_event('login', user, "User '#{user.login}' logged in")
+    record_login_history!(user, auth_method: auth_method)
     session[:user]         = user.id
     user.claim_active_session
     if Foreman::Reauthentication.marks_login_as_fresh?(user)
@@ -554,6 +555,26 @@ class UsersController < ApplicationController
       :remote_address => request.remote_ip,
       :request_uuid => request.uuid
     )
+  end
+
+  # Interactive login history (F-001). Not used for CAPTCHA/auth failures,
+  # reauthentication, API/PAT, or page refreshes with an existing session.
+  def record_login_history!(user, auth_method: nil)
+    method = auth_method.presence || infer_login_auth_method(user)
+    UserLoginEvent.record_successful_login!(
+      user: user,
+      remote_ip: request.remote_ip,
+      request_host: request.host,
+      auth_method: method,
+      auth_source_name: user.auth_source&.name
+    )
+  end
+
+  def infer_login_auth_method(user)
+    return 'external' if user.auth_source.is_a?(AuthSourceExternal)
+    return 'ldap' if user.auth_source.is_a?(AuthSourceLdap)
+
+    'password'
   end
 
   def parameter_filter_context
