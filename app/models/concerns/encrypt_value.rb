@@ -9,13 +9,20 @@ module EncryptValue
   # 1) ENCRYPTION_KEY environment variable
   # 2) ENCRYPTION_KEY_FILE path (Docker/secret mount; never commit the file)
   # 3) EncryptionKey::ENCRYPTION_KEY from config/initializers/encryption_key.rb
+  #
+  # Blank / whitespace-only values are treated as unset so an empty compose
+  # interpolation cannot silently disable encryption.
   def encryption_key
-    return ENV['ENCRYPTION_KEY'] if ENV['ENCRYPTION_KEY'].present?
+    env_key = normalize_encryption_key(ENV['ENCRYPTION_KEY'])
+    return env_key if env_key.present?
 
-    file_key = encryption_key_from_file
+    file_key = normalize_encryption_key(encryption_key_from_file)
     return file_key if file_key.present?
 
-    return EncryptionKey::ENCRYPTION_KEY if defined? EncryptionKey::ENCRYPTION_KEY
+    if defined?(EncryptionKey::ENCRYPTION_KEY)
+      const_key = normalize_encryption_key(EncryptionKey::ENCRYPTION_KEY)
+      return const_key if const_key.present?
+    end
 
     nil
   end
@@ -78,10 +85,20 @@ module EncryptValue
     return nil if path.blank?
     return nil unless File.file?(path) && File.readable?(path)
 
-    File.read(path).to_s.strip.presence
+    # Restrictive permissions are recommended (0600/0400); warn when group/other can read.
+    mode = File.stat(path).mode & 0o777
+    if (mode & 0o077) != 0
+      puts_and_logs("ENCRYPTION_KEY_FILE permissions are too open (mode #{mode.to_s(8)}); recommend 0600")
+    end
+
+    File.read(path).to_s
   rescue Errno::ENOENT, Errno::EACCES => e
     puts_and_logs("ENCRYPTION_KEY_FILE unreadable (#{e.class})")
     nil
+  end
+
+  def normalize_encryption_key(value)
+    value.to_s.strip.presence
   end
 
   def puts_and_logs(msg, level = Logger::WARN)
