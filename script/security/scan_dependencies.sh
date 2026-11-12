@@ -128,15 +128,17 @@ scan_npm() {
 scan_image() {
   local image="${SCAN_IMAGE:?SCAN_IMAGE required for image scan}"
   echo "==> Trivy image scan (${TRIVY_IMAGE}) target=${image}"
-  # Prefer ghcr.io DB mirror; some environments block mirror.gcr.io (403).
+  # Prefer ghcr.io DB mirrors; some environments block mirror.gcr.io (403).
   docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$OUT_DIR":/out \
     -e TRIVY_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-db \
+    -e TRIVY_JAVA_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-java-db \
     "$TRIVY_IMAGE" \
     image --scanners vuln --format json --output /out/trivy.raw.json \
     --severity CRITICAL,HIGH,MEDIUM,LOW \
     --db-repository ghcr.io/aquasecurity/trivy-db \
+    --java-db-repository ghcr.io/aquasecurity/trivy-java-db \
     "$image"
   if [[ ! -s "$OUT_DIR/trivy.raw.json" ]]; then
     printf '{"scanner_error":"trivy produced empty output"}\n' >"$OUT_DIR/trivy.raw.json"

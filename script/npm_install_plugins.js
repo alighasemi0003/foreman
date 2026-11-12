@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// F-037: --no-audit keeps plugin installs reproducible/offline. Advisory scanning
+// is performed by .github/workflows/dependency_security.yml (npm audit), not here.
 const childProcess = require('child_process');
 const { packageJsonDirs } = require('./plugin_webpack_directories');
 

@@ -48,12 +48,13 @@ Target attempted: `foreman-local:security-hardening-5.0`.
 | Attempt | Result |
 |---------|--------|
 | Trivy default DB (`mirror.gcr.io`) | **Failed** — HTTP 403 downloading DB |
-| Trivy `ghcr.io/aquasecurity/trivy-db` | **Failed** locally — download interrupted (`unexpected EOF`) |
+| Trivy `ghcr.io` vuln DB | Download progressed |
+| Trivy Java DB on gcr | **Failed** — HTTP 403 (fixed in scripts via ghcr java-db) |
+| Trivy full image analysis | **Failed** locally — `context deadline exceeded` walking image layer |
 
 **Final image was not successfully scanned in this lab environment.** CI workflow
-still builds the image and runs Trivy (with `TRIVY_DB_REPOSITORY=ghcr.io/…`).
-When the vulnerability DB cannot be downloaded, policy treats this as
-**scanner failure** (exit 2), **not** as zero findings.
+still builds the image and runs Trivy (ghcr vuln + Java DB). Scanner/DB/analysis
+failures must yield gate exit **2**, never a clean zero-vuln result.
 
 ## Gate result (Ruby + npm, empty exceptions)
 

@@ -1,6 +1,7 @@
 name: Dependency & container security
 
-# F-037 — SCA for Ruby gems, npm production deps, and (when built) the app image.
+# F-037 / audit requirement 76 (checklist p.55):
+# Explicit SCA — bundler-audit, npm audit, Trivy — separate from npm --no-audit installs.
 on:
   pull_request:
   push:
@@ -94,6 +95,7 @@ jobs:
         id: npm_audit
         continue-on-error: true
         run: |
+          # Explicit audit — compensates for --no-audit on npm ci/install elsewhere.
           set +e
           npm audit --omit=dev --json > tmp/security-scan/npm-audit.raw.json 2> tmp/security-scan/npm-audit.stderr
           echo "npm_exit=$?" >> "$GITHUB_OUTPUT"
@@ -101,6 +103,21 @@ jobs:
             echo '{"scanner_error":"npm audit returned non-JSON"}' > tmp/security-scan/npm-audit.raw.json
           fi
           npm audit --json > tmp/security-scan/npm-audit-full.raw.json || true
+
+      - name: Assert advisory scanners produced reports
+        run: |
+          test -s tmp/security-scan/bundler-audit.raw.json
+          test -s tmp/security-scan/npm-audit.raw.json
+          # Refuse empty "success" pretending scanners never ran
+          python - <<'PY'
+          import json, pathlib, sys
+          for p in ("tmp/security-scan/bundler-audit.raw.json", "tmp/security-scan/npm-audit.raw.json"):
+              raw = pathlib.Path(p).read_text()[:200]
+              if "scanner_error" in raw and "produced no JSON" in raw:
+                  # normalize/gate will fail closed; still surface here
+                  print(f"WARN: {p} embeds scanner_error marker")
+          print("advisory report files present")
+          PY
 
       - name: Normalize reports
         run: |
@@ -158,6 +175,7 @@ jobs:
         uses: aquasecurity/trivy-action@0.28.0
         env:
           TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db
+          TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db
         with:
           image-ref: foreman:security-scan
           format: json

@@ -67,6 +67,9 @@ RUN \
 
 # npm install needs the full tree (plugin discovery scripts); keep after source COPY.
 # Foreman does not track package-lock.json; keep upstream npm install semantics.
+# --no-audit: keep install offline/reproducible (no advisory network in the build
+# layer). F-037 SCA is enforced separately by
+# .github/workflows/dependency_security.yml (npm audit + bundler-audit + Trivy).
 RUN chmod +x script/npm_install_plugins.js script/plugin_webpack_directories.rb && \
   npm install --no-audit --no-optional && \
   ./node_modules/webpack/bin/webpack.js --config config/webpack.config.js && \

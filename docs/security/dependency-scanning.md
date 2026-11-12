@@ -1,8 +1,10 @@
 # Dependency and container security scanning (F-037)
 
-Audit requirement **76**. Implements software composition analysis (SCA) for
-Ruby gems, npm production dependencies, and the Foreman container image, with
-a policy gate and time-limited exceptions.
+Audit requirement **76** (چک‌لیست امنیتی، صفحه ۵۵). Implements software
+composition analysis (SCA) for Ruby gems, npm production dependencies, and the
+Foreman container image, with a policy gate and time-limited exceptions.
+
+Formal assessment evidence: [sca-assessment-report.md](sca-assessment-report.md).
 
 ## Scope
 
@@ -28,6 +30,14 @@ Full machine-readable policy: [`config/security/scan-policy.yml`](../../config/s
 - **Scanner / advisory DB failure:** exit **2** — never reported as zero vulnerabilities.
 - **Dev npm dependencies:** omitted from the gating audit; full audit retained as artifact.
 - **Ownership (proposed):** Security Team reviews exceptions; Foreman Development remediates upgrades.
+
+## Treatment of `--no-audit` (audit finding)
+
+`npm ci` / `npm install --no-audit` in Docker and ordinary test workflows keeps
+**installation** offline and reproducible. That does **not** waive SCA: the
+`dependency_security` workflow runs `npm audit` and fails on unapproved
+critical/high findings. Full call-site list:
+[sca-assessment-report.md](sca-assessment-report.md) §3.
 
 ## Exception workflow
 
@@ -132,9 +142,10 @@ must **fail** (exit 2). Do not merge on “empty” results.
   libraries that ship in webpack bundles — treat as production-relevant.
 - Trivy OS findings on CentOS Stream 9 may lack fixes; except or rebuild base deliberately.
 - Plugin-only manifests outside this repo are not scanned here.
-- Some networks block `mirror.gcr.io` Trivy DB (HTTP 403); scripts/CI prefer
-  `ghcr.io/aquasecurity/trivy-db`. Large DB downloads may still fail offline —
-  that must fail the gate (exit 2), never report a clean image.
+- Some networks block `mirror.gcr.io` Trivy DB/Java-DB (HTTP 403); scripts/CI
+  prefer `ghcr.io/aquasecurity/trivy-db` and `trivy-java-db`. Large image
+  analysis may still time out in constrained labs — that must fail the gate
+  (exit 2), never report a clean image.
 
 ## Remediation posture
 

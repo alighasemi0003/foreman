@@ -106,6 +106,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.node }}-
         if: contains(matrix.task, 'compile')
+      # --no-audit: install only. SCA (npm audit / bundler-audit / Trivy) is
+      # enforced by workflow dependency_security.yml (F-037 / audit req 76).
       - name: Generate package-lock.json
         run: npm install --package-lock-only --no-audit
         if: contains(matrix.task, 'compile')
