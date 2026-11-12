@@ -14,6 +14,9 @@ config/settings.plugins.d
 config/database.yml
 config/initializers/local_secret_token.rb
 config/initializers/encryption_key.rb
+# Local encryption key material (F-004) — never commit
+secrets/*
+!secrets/.gitkeep
 # Gemfile.lock is tracked for deterministic Docker/Ruby installs on this branch
 bundler.d/*.local.rb
 *.sw?

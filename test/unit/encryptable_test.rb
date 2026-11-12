@@ -141,4 +141,33 @@ class EncryptableTest < ActiveSupport::TestCase
     encrypted_str = compute_resource.encrypt_field(nil)
     assert_nil encrypted_str
   end
+
+  test "encrypt_field refuses plaintext storage when key is missing" do
+    cr = FactoryBot.build_stubbed(:ec2_cr)
+    cr.stubs(:encryption_key).returns(nil)
+    assert_raises(Foreman::Exception) { cr.encrypt_field('secretpassword') }
+  end
+
+  test "encryption_key reads ENCRYPTION_KEY_FILE when ENV key absent" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'encryption_key')
+      File.write(path, "25d224dd383e92a7e0c82b8bf7c985e815f34cf5\n")
+      old_key = ENV['ENCRYPTION_KEY']
+      old_file = ENV['ENCRYPTION_KEY_FILE']
+      begin
+        ENV.delete('ENCRYPTION_KEY')
+        ENV['ENCRYPTION_KEY_FILE'] = path
+        ComputeResource.any_instance.unstub(:encryption_key)
+        cr = FactoryBot.build_stubbed(:ec2_cr)
+        assert_equal '25d224dd383e92a7e0c82b8bf7c985e815f34cf5', cr.encryption_key
+        encrypted = cr.encrypt_field('file-key-secret')
+        assert cr.matches_prefix?(encrypted)
+        assert_equal 'file-key-secret', cr.decrypt_field(encrypted)
+      ensure
+        ENV['ENCRYPTION_KEY'] = old_key
+        ENV['ENCRYPTION_KEY_FILE'] = old_file
+        ComputeResource.any_instance.stubs(:encryption_key).returns(nil)
+      end
+    end
+  end
 end

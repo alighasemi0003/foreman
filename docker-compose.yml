@@ -43,6 +43,10 @@ services:
       - FOREMAN_RAILS_CACHE_STORE_URLS=redis://redis-cache:6379/0
       - DYNFLOW_REDIS_URL=redis://redis-tasks:6379/0
       - REDIS_PROVIDER=DYNFLOW_REDIS_URL
+      # DB-field encryption (EncryptValue). Set ENCRYPTION_KEY in .env (never commit).
+      # Optionally set ENCRYPTION_KEY_FILE to a mounted secret path. See docs/encryption-key.md.
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - ENCRYPTION_KEY_FILE=${ENCRYPTION_KEY_FILE:-}
     hostname: foreman.example.com
     depends_on:
       db:
