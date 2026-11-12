@@ -45,6 +45,8 @@ custom_plan.rb
 pkg/
 config/hooks
 *.csv
+# F-035 audit traceability matrix (machine-readable companion to Markdown)
+!docs/security/threat-control-matrix.csv
 .envrc
 node_modules
 vendor/bundle
