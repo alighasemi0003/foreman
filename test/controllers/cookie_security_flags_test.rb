@@ -60,11 +60,21 @@ class CookieSecurityFlagsTest < ActiveSupport::TestCase
     assert_match(/;\s*path=\//i, header)
   end
 
-  test 'session cookie value is opaque sid without embedded auth secrets' do
+  test 'session cookie value is encrypted and does not embed auth secrets' do
     header = ping_set_cookie
-    value = header.split(';', 2).first.split('=', 2).last
+    value = CGI.unescape(header.split(';', 2).first.split('=', 2).last.to_s)
+    assert_match(/\AFSC1:/, value)
+    refute_match(/\A[0-9a-f]{32}\z/i, value)
     refute_match(/password|token|bearer|jwt/i, value)
     refute_match(/\AeyJ/, value)
+    # Non-persistent session cookie: no Max-Age / Expires on the session line.
+    refute_match(/;\s*Max-Age=/i, header)
+    refute_match(/;\s*Expires=/i, header)
+  end
+
+  test 'session store uses encrypted active record store' do
+    assert_equal ActionDispatch::Session::EncryptedActiveRecordStore,
+                 Rails.application.config.session_store
   end
 
   test 'no SameSite=None cookie is issued without Secure on ping' do

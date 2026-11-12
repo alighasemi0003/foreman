@@ -49,22 +49,10 @@ class ForemanSessionStoreEncryptedMarshalSerializerTest < ActiveSupport::TestCas
   end
 
   test 'wrong key fails safely' do
-    stored = Serializer.dump(@payload)
-    Serializer.reset_encryptor!
-    # Swap secret_key_base temporarily
-    app = Rails.application
-    original = app.secret_key_base
-    begin
-      app.secret_key_base = '0' * 64
-      # key_generator is memoized on the app — rebuild path via reset + new generator use
-      app.instance_variable_set(:@key_generator, nil) if app.instance_variable_defined?(:@key_generator)
-      Serializer.reset_encryptor!
-      assert_nil Serializer.load(stored)
-    ensure
-      app.secret_key_base = original
-      app.instance_variable_set(:@key_generator, nil) if app.instance_variable_defined?(:@key_generator)
-      Serializer.reset_encryptor!
-    end
+    other_key = '1' * ActiveSupport::MessageEncryptor.key_len
+    plain = Base64.strict_encode64(Marshal.dump(@payload))
+    forged = "#{Serializer::PREFIX}#{ActiveSupport::MessageEncryptor.new(other_key).encrypt_and_sign(plain)}"
+    assert_nil Serializer.load(forged)
   end
 
   test 'session model uses encrypted serializer for new writes' do

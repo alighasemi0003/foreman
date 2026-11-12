@@ -259,8 +259,11 @@ module Foreman
     # follows trusted_proxies — never raw X-Forwarded-For alone.
     config.middleware.insert_after ActionDispatch::RemoteIp, Foreman::Middleware::HttpRateLimit
 
+    # F-017 session store class must be loaded before middleware references it.
+    require 'action_dispatch/session/encrypted_active_record_store'
     config.middleware.insert_before Rails::Rack::Logger, Foreman::Middleware::LoggingContextRequest
-    config.middleware.insert_after ActionDispatch::Session::ActiveRecordStore, Foreman::Middleware::LoggingContextSession
+    config.middleware.insert_after ActionDispatch::Session::EncryptedActiveRecordStore,
+      Foreman::Middleware::LoggingContextSession
 
     # Add apidoc hash in headers for smarter caching
     config.middleware.use Apipie::Middleware::ChecksumInHeaders
@@ -363,7 +366,9 @@ module Foreman
     # - secure: HTTPS when SETTINGS[:require_ssl] (aligned with force_ssl)
     # - httponly: block document.cookie access to the session id
     # - same_site: Lax — defense in depth; CSRF tokens remain primary CSRF control
-    config.session_store :active_record_store,
+    # F-017: EncryptedActiveRecordStore wraps the opaque public sid in the cookie
+    # with MessageEncryptor; session payload encryption remains F-015.
+    config.session_store :encrypted_active_record_store,
       :key => '_session_id',
       :secure => !!SETTINGS[:require_ssl],
       :httponly => true,

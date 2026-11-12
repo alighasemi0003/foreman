@@ -53,6 +53,7 @@ administrator prefers immediate invalidation instead of lazy rewrite.
 Tampered ciphertext, wrong key, or corrupt payloads load as an empty session
 (user appears logged out). Errors log the exception **class** only.
 
-## Out of scope
+## Out of scope (see F-017)
 
-Cookie encryption, TLS, JWT/PAT, and EncryptValue field encryption are unchanged.
+Browser cookie encryption is **F-017** (`docs/session-cookie-encryption.md`).
+TLS, JWT/PAT, and EncryptValue field encryption remain separate.
