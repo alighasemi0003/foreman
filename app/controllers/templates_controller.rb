@@ -114,6 +114,10 @@ class TemplatesController < ApplicationController
   end
 
   def export
+    Foreman::OutputClassification.apply_headers!(
+      response,
+      Foreman::OutputClassification.for_kind('template_export')
+    )
     send_data @template.to_erb, :type => 'text/plain', :disposition => 'attachment', :filename => @template.filename
   end
 

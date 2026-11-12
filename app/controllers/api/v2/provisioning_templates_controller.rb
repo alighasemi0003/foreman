@@ -129,6 +129,10 @@ module Api
       api :GET, '/provisioning_templates/:id/export', N_('Export a provisioning template to ERB')
       param :id, :identifier, :required => true
       def export
+        Foreman::OutputClassification.apply_headers!(
+          response,
+          Foreman::OutputClassification.for_kind('template_export')
+        )
         send_data @provisioning_template.to_erb, :type => 'text/plain', :disposition => 'attachment', :filename => @provisioning_template.filename
       end
 

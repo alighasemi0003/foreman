@@ -108,6 +108,10 @@ module Api
       api :GET, '/report_templates/:id/export', N_('Export a report template to ERB')
       param :id, :identifier, :required => true
       def export
+        Foreman::OutputClassification.apply_headers!(
+          response,
+          Foreman::OutputClassification.for_kind('template_export')
+        )
         send_data @report_template.to_erb, :type => 'text/plain', :disposition => 'attachment', :filename => @report_template.filename
       end
 
@@ -120,8 +124,12 @@ module Api
       def generate
         @composer = ReportComposer.from_api_params(params)
         if @composer.valid?
-          response = @composer.render(params: params)
-          send_data response, type: @composer.mime_type, filename: @composer.report_filename
+          Foreman::OutputClassification.apply_headers!(
+            self.response,
+            Foreman::OutputClassification.for_kind('report_template_output')
+          )
+          rendered = @composer.render(params: params)
+          send_data rendered, type: @composer.mime_type, filename: @composer.report_filename
         else
           @report_template = @composer
           process_resource_error
@@ -190,6 +198,10 @@ module Api
           data = StoredValue.read(params[:job_id])
           return not_found(_('Report data are not available, it has probably expired.')) unless data
           data = data.to_json if @composer.mime_type == 'application/json'
+          Foreman::OutputClassification.apply_headers!(
+            response,
+            Foreman::OutputClassification.for_kind('report_template_output')
+          )
           send_data data, type: @composer.mime_type, filename: @composer.report_filename
         end
       end

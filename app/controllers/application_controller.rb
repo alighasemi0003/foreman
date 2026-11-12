@@ -17,6 +17,7 @@ class ApplicationController < ActionController::Base
 
   # standard layout to all controllers
   helper 'layout'
+  helper OutputClassificationHelper
   helper_method :resource_path
 
   before_action :load_settings
@@ -29,6 +30,7 @@ class ApplicationController < ActionController::Base
   before_action :set_taxonomy, :require_mail, :check_empty_taxonomy
   before_action :authorize
   before_action :welcome, :find_selected_columns, :only => :index, :unless => :api_request?
+  after_action :apply_ui_output_classification_headers, :unless => :api_request?
   around_action :set_timezone
 
   attr_reader :original_search_parameter
@@ -460,6 +462,16 @@ class ApplicationController < ActionController::Base
   def wrap_for_virt_column_select(base_scope)
     scope = virtual_column_scope(base_scope) || base_scope.search_for(params[:search], :order => params[:order])
     scope.paginate(:page => params[:page], :per_page => params[:per_page])
+  end
+
+  # F-013: label interactive HTML responses (print + transfer metadata).
+  # Ignores any client-supplied classification parameter.
+  def apply_ui_output_classification_headers
+    return unless User.current
+    return unless response&.media_type.to_s.include?('html')
+
+    level = @output_classification.presence || Foreman::OutputClassification.for_kind('ui_html')
+    Foreman::OutputClassification.apply_headers!(response, level)
   end
 
   class << self

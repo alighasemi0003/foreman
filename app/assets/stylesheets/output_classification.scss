@@ -1,0 +1,27 @@
+/* F-013: visible classification label for printable HTML pages. */
+.foreman-classification-banner {
+  display: none;
+}
+
+@media print {
+  .foreman-classification-banner {
+    display: block !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 99999;
+    padding: 0.4rem 0.75rem;
+    margin: 0;
+    border-bottom: 2px solid #000;
+    background: #fff;
+    color: #000;
+    font-size: 12pt;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  body {
+    margin-top: 2rem;
+  }
+}

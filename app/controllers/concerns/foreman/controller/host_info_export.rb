@@ -31,6 +31,16 @@ module Foreman::Controller::HostInfoExport
     payload
   end
 
+  # F-013 classification for ENC/YAML (independent of authz; cannot be lowered by params).
+  def host_info_output_classification(reveal: reveal_hidden_host_info_secrets?)
+    Foreman::OutputClassification.for_kind('host_enc', secrets_revealed: reveal)
+  end
+
+  def apply_host_info_export_headers!(reveal: reveal_hidden_host_info_secrets?)
+    level = host_info_output_classification(reveal: reveal)
+    Foreman::ExportSecurity.apply_sensitive_download_headers(response, classification: level)
+  end
+
   def log_host_info_export(host, reveal:)
     Foreman::SecurityEvent.log(
       event: 'HOST_INFO_EXPORT',

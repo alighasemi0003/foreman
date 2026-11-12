@@ -47,4 +47,11 @@ class Foreman::ExportSecurityTest < ActiveSupport::TestCase
     assert_match(/no-store/, response.headers['Cache-Control'])
     assert_equal 'no-cache', response.headers['Pragma']
   end
+
+  test 'apply_sensitive_download_headers can attach classification' do
+    response = ActionDispatch::Response.new
+    Foreman::ExportSecurity.apply_sensitive_download_headers(response, classification: 'restricted')
+    assert_match(/no-store/, response.headers['Cache-Control'])
+    assert_equal 'restricted', response.headers['X-Foreman-Classification']
+  end
 end

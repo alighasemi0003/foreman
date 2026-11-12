@@ -80,9 +80,10 @@ class KeyPairsController < ApplicationController
       format: encrypted ? 'encrypted pem' : 'pem',
     })
     filename = Foreman::UploadSecurity.safe_download_filename("#{@key_pair.name}.pem", default: 'key.pem')
-    response.headers['Cache-Control'] = 'private, no-store, no-cache, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    Foreman::ExportSecurity.apply_sensitive_download_headers(
+      response,
+      classification: Foreman::OutputClassification.for_kind('key_pair_pem')
+    )
     send_data payload, :filename => filename, :disposition => 'attachment', :type => 'application/x-pem-file'
   end
 

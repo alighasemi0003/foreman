@@ -1,5 +1,8 @@
 # Sensitive data in reports, templates and exports (F-019)
 
+Output **labels** for these categories are applied by F-013
+(`docs/output-classification.md`). This document covers field redaction.
+
 ## Classification
 
 | Category | Examples | Default treatment |

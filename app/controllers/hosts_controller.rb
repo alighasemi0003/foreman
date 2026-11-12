@@ -75,8 +75,12 @@ class HostsController < ApplicationController
         @report_summary = ConfigReport.summarise(@range.days.ago, @host)
       end
       format.yaml do
-        Foreman::ExportSecurity.apply_sensitive_download_headers(response)
-        render :plain => host_info_for_export(@host).to_yaml
+        reveal = reveal_hidden_host_info_secrets?
+        apply_host_info_export_headers!(reveal: reveal)
+        level = host_info_output_classification(reveal: reveal)
+        payload = host_info_for_export(@host)
+        # YAML comment preamble labels the download; document body stays parseable.
+        render :plain => Foreman::OutputClassification.labeled_yaml(payload, level)
       end
       format.json
     end

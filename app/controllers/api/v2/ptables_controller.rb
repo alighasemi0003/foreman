@@ -115,6 +115,10 @@ module Api
       api :GET, '/ptables/:id/export', N_('Export a partition template to ERB')
       param :id, :identifier, :required => true
       def export
+        Foreman::OutputClassification.apply_headers!(
+          response,
+          Foreman::OutputClassification.for_kind('template_export')
+        )
         send_data @ptable.to_erb, :type => 'text/plain', :disposition => 'attachment', :filename => @ptable.filename
       end
 

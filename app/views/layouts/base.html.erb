@@ -7,6 +7,10 @@
     <meta name="description" content="">
     <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
     <%= yield(:meta) %>
+    <% if show_output_classification_print_banner? %>
+      <meta name="foreman-classification" content="<%= h(output_classification_level) %>">
+      <meta name="foreman-classification-label" content="<%= h(Foreman::OutputClassification.label_for(output_classification_level)) %>">
+    <% end %>
 
     <%= favicon_link_tag "favicon.ico"%>
 
@@ -55,6 +59,11 @@
       <%= _('You are using an unsupported browser.') %>
       <%= _('See list of supported browsers: %s') % documentation_url("3.1.4BrowserCompatibility") %>
     <![endif]-->
+    <% if show_output_classification_print_banner? %>
+      <div id="foreman-classification-print" class="foreman-classification-banner" data-classification="<%= h(output_classification_level) %>">
+        <%= h(output_classification_print_label) %>
+      </div>
+    <% end %>
     <% if User.current %>
       <% cache(TopbarSweeper.fragment_name, :skip_digest => true) do %>
         <%= mount_react_app %>

@@ -49,10 +49,14 @@ module Foreman
       end
     end
 
-    def apply_sensitive_download_headers(response)
+    def apply_sensitive_download_headers(response, classification: nil)
       response.headers['Cache-Control'] = 'private, no-store, no-cache, must-revalidate'
       response.headers['Pragma'] = 'no-cache'
       response.headers['Expires'] = '0'
+      if classification
+        Foreman::OutputClassification.apply_headers!(response, classification)
+      end
+      response
     end
   end
 end

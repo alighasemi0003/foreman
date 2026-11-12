@@ -181,7 +181,9 @@ module Api
       param :show_hidden_parameters, :bool, :desc => N_("When false, redact hidden parameter values even if the user can edit parameters. Hidden values are always redacted without edit_params.")
 
       def enc
-        Foreman::ExportSecurity.apply_sensitive_download_headers(response)
+        reveal = reveal_hidden_host_info_secrets?
+        apply_host_info_export_headers!(reveal: reveal)
+        # Schema unchanged: classification is carried in HTTP headers (F-013).
         render :json => { :data => host_info_for_export(@host) }
       end
 
@@ -348,8 +350,9 @@ module Api
       param :id, :identifier_dottable, :required => true
       param :show_hidden_parameters, :bool, :desc => N_("Display hidden parameter values (requires edit_params)")
       def inherited_parameters
-        Foreman::ExportSecurity.apply_sensitive_download_headers(response)
         reveal = reveal_hidden_parameters_for_api?
+        level = Foreman::OutputClassification.for_kind('inherited_parameters', secrets_revealed: reveal)
+        Foreman::ExportSecurity.apply_sensitive_download_headers(response, classification: level)
         payload = Foreman::ExportSecurity.serialize_parameters_for_export(
           @host.host_inherited_params_objects,
           reveal_hidden: reveal

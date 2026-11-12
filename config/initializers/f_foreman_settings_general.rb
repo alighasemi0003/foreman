@@ -104,5 +104,10 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Foreman will load the new UI for host details"),
       default: true,
       full_name: N_('New host details UI'))
+    setting('output_classification_enabled',
+      type: :boolean,
+      description: N_("Attach proposed information-classification labels to supported exports, downloads and printable pages (HTTP headers, YAML comments, print banner). Does not replace access control or F-019 redaction."),
+      default: true,
+      full_name: N_('Label classified outputs'))
   end
 end
