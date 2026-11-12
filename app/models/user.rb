@@ -357,8 +357,12 @@ class User < ApplicationRecord
     User.current = self
   end
 
-  # Tip 3.19 concurrent UI-session flag (Control #20). Concurrent logins are allowed;
-  # logout/admin terminate clears the flag so remaining UI sessions are rejected.
+  # Tip 3.19 / Control #20 / F-016: interactive browser session gate.
+  #
+  # Policy (newer-login-wins): a successful interactive login claims the active
+  # flag and deletes other ActiveRecord session rows for this user, so older
+  # browser cookies cannot continue. Logout / admin terminate clear the flag
+  # and wipe stored sessions. API / PAT / JWT paths do not use this gate.
   def claim_active_session
     return false unless has_attribute?(:has_active_session)
 
@@ -374,6 +378,12 @@ class User < ApplicationRecord
     self.has_active_session = false
   end
 
+  # Remove other browser sessions for this user (newer-login-wins).
+  # keep_session_id must be the Rack private session id stored in sessions.session_id.
+  def invalidate_other_browser_sessions!(keep_session_id: nil)
+    self.class.delete_stored_sessions_for_users([id], keep_session_ids: Array(keep_session_id).compact)
+  end
+
   def terminate_active_sessions!
     self.class.terminate_active_sessions_for([id])
   end
@@ -387,9 +397,13 @@ class User < ApplicationRecord
     delete_stored_sessions_for_users(user_ids)
   end
 
-  def self.delete_stored_sessions_for_users(user_ids)
+  def self.delete_stored_sessions_for_users(user_ids, keep_session_ids: [])
     require 'active_record/session_store/session'
+    keep = Array(keep_session_ids).compact.map(&:to_s)
+    user_ids = Array(user_ids).compact.map(&:to_i)
     ActiveRecord::SessionStore::Session.find_each do |stored_session|
+      next if keep.include?(stored_session.session_id.to_s)
+
       data = stored_session.data
       user_id = data['user'] || data[:user]
       stored_session.delete if user_ids.include?(user_id.to_i)

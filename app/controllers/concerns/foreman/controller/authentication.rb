@@ -41,7 +41,8 @@ module Foreman::Controller::Authentication
     true
   end
 
-  # Tip 3.19 Control #20: reject UI sessions after logout/admin terminate.
+  # Tip 3.19 / F-016: reject UI sessions after logout, admin terminate, or
+  # replacement by a newer interactive login (has_active_session cleared / row gone).
   def check_active_session
     return true if ignore_api_request?
     return true unless User.current
@@ -112,11 +113,20 @@ module Foreman::Controller::Authentication
       backup_session_content { reset_session }
       user.claim_active_session
       session[:user] = user.id
+      user.invalidate_other_browser_sessions!(keep_session_id: browser_session_private_id)
       update_activity_time
       # First UI SSO session establishment (not form login_user, not API/PAT).
       record_sso_login_history!(user)
     end
     user.present?
+  end
+
+  # Private id written to sessions.session_id by ActiveRecord::SessionStore.
+  def browser_session_private_id
+    sid = session.id
+    return sid.private_id if sid.respond_to?(:private_id)
+
+    sid.to_s.presence
   end
 
   def record_sso_login_history!(user)

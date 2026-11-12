@@ -526,6 +526,8 @@ class UsersController < ApplicationController
     queue_failed_login_notice!(user, event)
     session[:user]         = user.id
     user.claim_active_session
+    # F-016 newer-login-wins: drop other interactive sessions for this user.
+    user.invalidate_other_browser_sessions!(keep_session_id: browser_session_private_id)
     if Foreman::Reauthentication.marks_login_as_fresh?(user)
       Foreman::Reauthentication.mark_authenticated!(session, user)
     else
