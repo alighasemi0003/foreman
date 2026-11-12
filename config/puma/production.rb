@@ -7,15 +7,20 @@ state_permission 0o0640
 # Configure "min" to be the minimum number of threads to use to answer
 # requests and "max" the maximum.
 #
-# The default is "0, 16".
+# Default max is RAILS_MAX_THREADS (Rails convention) then 16. Keep
+# FOREMAN_PUMA_THREADS_MAX / RAILS_MAX_THREADS <= ActiveRecord pool
+# (DATABASE_URL ?pool= or database.yml) per worker process — see
+# docs/connection-capacity.md (F-027).
 #
-threads ENV.fetch('FOREMAN_PUMA_THREADS_MIN', 0).to_i, ENV.fetch('FOREMAN_PUMA_THREADS_MAX', 16).to_i
+puma_max_threads = ENV.fetch('FOREMAN_PUMA_THREADS_MAX') { ENV.fetch('RAILS_MAX_THREADS', '16') }.to_i
+threads ENV.fetch('FOREMAN_PUMA_THREADS_MIN', 0).to_i, puma_max_threads
 
 # === Cluster mode ===
 
 # How many worker processes to run.
 #
 # The default is "0" for puma. Recommending "2" for foreman
+# Each worker is a separate process with its own ActiveRecord pool.
 #
 workers ENV.fetch('FOREMAN_PUMA_WORKERS', 2).to_i
 

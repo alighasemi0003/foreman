@@ -152,6 +152,7 @@ COMPOSE_PROJECT_NAME=foreman-handoff docker compose --env-file .env.handoff down
 | Secrets | Rails `secret_key_base` is auto-generated under `tmp/` inside the container (ephemeral across recreate unless you persist it) |
 | npm lockfile | Intentionally untracked (upstream Foreman 5.0); image build runs `npm install` inside Docker |
 | Redis tag | Floating `redis` image tag — pin (e.g. `redis:7`) for stricter lab reproducibility |
+| DB connections | Keep Puma threads and Sidekiq `-c` ≤ `DATABASE_URL` pool — see [connection-capacity.md](connection-capacity.md) |
 
 ## Classification
 

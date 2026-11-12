@@ -31,8 +31,13 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
+      # F-027: pool >= Puma max threads per worker; Sidekiq -c <= pool.
+      # Budget (local): app 2 workers×5 + orchestrator 5 + worker 5 = 20 << PG max_connections 100.
       - DATABASE_URL=${DATABASE_URL:-postgres://foreman:foreman@db/foreman?pool=5}
-      - RAILS_MAX_THREADS=5
+      - RAILS_MAX_THREADS=${RAILS_MAX_THREADS:-5}
+      - FOREMAN_PUMA_THREADS_MIN=${FOREMAN_PUMA_THREADS_MIN:-0}
+      - FOREMAN_PUMA_THREADS_MAX=${FOREMAN_PUMA_THREADS_MAX:-5}
+      - FOREMAN_PUMA_WORKERS=${FOREMAN_PUMA_WORKERS:-2}
       - RAILS_ENV=production
       # Local compose serves HTTP on :3000 — do not enforce force_ssl here.
       # Production deployments must omit this (defaults to HTTPS) or set FOREMAN_REQUIRE_SSL=true.
@@ -78,7 +83,8 @@ services:
 
   worker:
     <<: *app_base
-    command: bundle exec sidekiq -r ./extras/dynflow-sidekiq.rb -c 15 -q default,1 -q remote_execution,1
+    # Concurrency must not exceed ActiveRecord pool (DATABASE_URL ?pool=).
+    command: bundle exec sidekiq -r ./extras/dynflow-sidekiq.rb -c ${FOREMAN_SIDEKIQ_CONCURRENCY:-5} -q default,1 -q remote_execution,1
     ports: []
     healthcheck:
       disable: true
