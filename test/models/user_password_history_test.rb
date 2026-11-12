@@ -7,7 +7,15 @@ class UserPasswordHistoryTest < ActiveSupport::TestCase
   CURRENT_MSG = 'The new password must be different from the current password.'
 
   setup do
-    @passwords = ['Password1!', 'Password2!', 'Password3!', 'Password4!', 'Password5!', 'Password6!']
+    # Consecutive passwords must satisfy F-008 edit-distance ≥ 4 when current_password is supplied.
+    @passwords = [
+      'AlphaPass1!',
+      'BravoKey2@xx',
+      'Charlie3#yyZ',
+      'DeltaLock4$',
+      'EchoGate5%ww',
+      'Foxtrot6^qqQ',
+    ]
     Setting[:password_history_length] = 3
     @user = FactoryBot.create(:user, :with_mail,
                               auth_source: auth_sources(:internal),

@@ -119,8 +119,8 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
       id: user.id,
       user: {
         current_password: 'Password1!',
-        password: 'Password2!',
-        password_confirmation: 'Password2!',
+        password: 'CompletelyNew9!',
+        password_confirmation: 'CompletelyNew9!',
       },
     }, session: set_session_user(user)
 
@@ -131,7 +131,7 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
 
     user.reload
     refute user.password_change_required?
-    assert user.matching_password?('Password2!')
+    assert user.matching_password?('CompletelyNew9!')
     refute user.matching_password?('Password1!')
   end
 
@@ -142,8 +142,8 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
       id: user.id,
       user: {
         current_password: 'Password1!',
-        password: 'Password2!',
-        password_confirmation: 'Password2!',
+        password: 'CompletelyNew9!',
+        password_confirmation: 'CompletelyNew9!',
       },
     }, session: session_data
     assert_redirected_to login_users_path
@@ -153,7 +153,7 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
     # After success the flag is cleared; with a forged session id the login filter decides.
     # Real runtime uses reset_session (new id). Assert password auth instead:
     refute user.reload.matching_password?('Password1!')
-    assert user.matching_password?('Password2!')
+    assert user.matching_password?('CompletelyNew9!')
   end
 
   test 'voluntary self change rejects reuse of current password' do
@@ -200,11 +200,28 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
       id: user.id,
       user: {
         current_password: 'Password1!',
-        password: 'Password2!',
-        password_confirmation: 'Password2!',
+        password: 'CompletelyNew9!',
+        password_confirmation: 'CompletelyNew9!',
       },
     }, session: set_session_user(user)
     assert_redirected_to login_users_path
     refute_match(%r{notification_recipients}, response.headers['Location'].to_s)
+  end
+
+  test 'forced user rejects password differing by fewer than four characters' do
+    user = create_local_user!(force: true)
+    put :update, params: {
+      id: user.id,
+      user: {
+        current_password: 'Password1!',
+        password: 'Password2!',
+        password_confirmation: 'Password2!',
+      },
+    }, session: set_session_user(user)
+    assert_minimal_forced_form!
+    assert_match(/at least 4 characters/i, response.body)
+    user.reload
+    assert user.password_change_required?
+    assert user.matching_password?('Password1!')
   end
 end

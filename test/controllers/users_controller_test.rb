@@ -142,12 +142,12 @@ class UsersControllerTest < ActionController::TestCase
 
     put :update, params: { :id => user.id,
                            :user => {
-                             :current_password => "Password1!", :password => "NewPass2!", :password_confirmation => "NewPass2!"
+                             :current_password => "Password1!", :password => "CompletelyNew9!", :password_confirmation => "CompletelyNew9!"
                            },
     }, session: set_session_user
 
     user.reload
-    assert user.matching_password?("NewPass2!")
+    assert user.matching_password?("CompletelyNew9!")
     assert_redirected_to users_path
   end
 

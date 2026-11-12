@@ -27,10 +27,11 @@ class UserPasswordReuseTest < ActiveSupport::TestCase
   test 'self change accepts a different complexity-compliant password' do
     as_user @user do
       @user.current_password = @password
-      @user.password = 'Password2!'
-      @user.password_confirmation = 'Password2!'
+      # Must also satisfy F-008 edit-distance ≥ 4 (Password2! is only distance 1).
+      @user.password = 'CompletelyNew9!'
+      @user.password_confirmation = 'CompletelyNew9!'
       assert @user.save, @user.errors.full_messages.to_sentence
-      assert @user.matching_password?('Password2!')
+      assert @user.matching_password?('CompletelyNew9!')
     end
   end
 

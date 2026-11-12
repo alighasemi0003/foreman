@@ -36,10 +36,11 @@ Never stores plaintext, reversible ciphertext, or logs passwords.
 ## Password-change flow
 
 1. Complexity validation  
-2. Current-password reuse rejection  
-3. Historical reuse rejection (last **N** records)  
-4. On success (same DB transaction): archive outgoing hash+salt, update current
-   password / `password_changed_at`, prune to **N**
+2. Current-password reuse rejection (exact hash match)  
+3. Minimum edit-distance ≥ 4 when `current_password` is present (F-008)  
+4. Historical reuse rejection (last **N** records)  
+5. On success (same DB transaction): archive outgoing hash+salt, update current
+    password / `password_changed_at`, prune to **N**
 
 Covered paths: self-service change, forced / expired renewal, administrator
 reset, API user update — all go through `User` save callbacks.

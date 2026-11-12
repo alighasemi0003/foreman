@@ -9,8 +9,9 @@ class PasswordHistoryForcedChangeTest < ActionController::TestCase
     Setting[:require_reauth_users_change_password] = false
     Setting[:password_history_length] = 3
     @password = 'Password1!'
-    @next = 'Password2!'
+    @next = 'CompletelyNew9!' # F-008: edit-distance ≥ 4 from @password
     @reuse = 'Password1!'
+    @unique = 'TotallyFresh8@'
     @user = FactoryBot.create(:user, :with_mail,
                               password: @password,
                               password_confirmation: @password,
@@ -20,7 +21,7 @@ class PasswordHistoryForcedChangeTest < ActionController::TestCase
       @user.current_password = @password
       @user.password = @next
       @user.password_confirmation = @next
-      assert @user.save
+      assert @user.save, @user.errors.full_messages.to_sentence
     end
     @user.update_columns(password_change_required: true)
   end
@@ -51,13 +52,13 @@ class PasswordHistoryForcedChangeTest < ActionController::TestCase
           id: @user.id,
           user: {
             current_password: @next,
-            password: 'Password9!',
-            password_confirmation: 'Password9!'
+            password: @unique,
+            password_confirmation: @unique
           }
         },
         session: set_session_user(@user)
     assert_redirected_to login_users_path
-    assert @user.reload.matching_password?('Password9!')
+    assert @user.reload.matching_password?(@unique)
   end
 end
 
@@ -71,11 +72,12 @@ class PasswordHistoryApiUpdateTest < ActionController::TestCase
     @user = FactoryBot.create(:user, :with_mail,
                               password: @password,
                               password_confirmation: @password)
+    @next = 'CompletelyNew9!'
     as_user @user do
       @user.current_password = @password
-      @user.password = 'Password2!'
-      @user.password_confirmation = 'Password2!'
-      assert @user.save
+      @user.password = @next
+      @user.password_confirmation = @next
+      assert @user.save, @user.errors.full_messages.to_sentence
     end
   end
 
@@ -88,7 +90,7 @@ class PasswordHistoryApiUpdateTest < ActionController::TestCase
         params: {
           id: @user.id,
           user: {
-            current_password: 'Password2!',
+            current_password: @next,
             password: @password,
             password_confirmation: @password
           }
@@ -96,8 +98,8 @@ class PasswordHistoryApiUpdateTest < ActionController::TestCase
         session: set_session_user(@user)
     assert_response :unprocessable_entity
     body = ActiveSupport::JSON.decode(@response.body)
-    assert_match(/recently used|different from the current/i, body.to_s)
-    assert @user.reload.matching_password?('Password2!')
+    assert_match(/recently used|different from the current|at least 4 characters/i, body.to_s)
+    assert @user.reload.matching_password?(@next)
   end
 end
 
@@ -113,11 +115,12 @@ class PasswordHistoryExpirationRenewalTest < ActionController::TestCase
                               password: @password,
                               password_confirmation: @password,
                               password_change_required: false)
+    @next = 'CompletelyNew9!'
     as_user @user do
       @user.current_password = @password
-      @user.password = 'Password2!'
-      @user.password_confirmation = 'Password2!'
-      assert @user.save
+      @user.password = @next
+      @user.password_confirmation = @next
+      assert @user.save, @user.errors.full_messages.to_sentence
     end
     @user.update_columns(password_changed_at: 40.days.ago.utc)
   end
@@ -132,7 +135,7 @@ class PasswordHistoryExpirationRenewalTest < ActionController::TestCase
         params: {
           id: @user.id,
           user: {
-            current_password: 'Password2!',
+            current_password: @next,
             password: @password,
             password_confirmation: @password
           }

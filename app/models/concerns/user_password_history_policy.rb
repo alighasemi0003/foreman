@@ -5,6 +5,7 @@
 # Setting[:password_history_length] = N
 #   - N is the maximum number of *previous* password hash records retained/checked
 #   - The *current* password is always rejected separately (ensure_new_password_differs_from_current)
+#   - When current_password is supplied, F-008 also requires Levenshtein distance ≥ 4
 #   - N = 0 disables historical checking (and prunes stored history on next successful change)
 #   - Range 0..24 (upper bound limits expensive bcrypt/PBKDF2 comparisons)
 #

@@ -12,7 +12,8 @@ class PasswordExpirationEnforcementTest < ActionController::TestCase
     @user = FactoryBot.create(:user, :with_mail,
                               password: @password,
                               password_confirmation: @password,
-                              password_change_required: false)
+                              password_change_required: false,
+                              roles: [roles(:viewer)])
     Setting[:password_max_age] = 30
     @user.update_columns(password_changed_at: 40.days.ago.utc)
   end
@@ -74,8 +75,8 @@ class PasswordExpirationUsersControllerTest < ActionController::TestCase
           id: @user.id,
           user: {
             current_password: @password,
-            password: 'Password2!',
-            password_confirmation: 'Password2!'
+            password: 'CompletelyNew9!',
+            password_confirmation: 'CompletelyNew9!'
           }
         },
         session: set_session_user(@user)
@@ -99,6 +100,23 @@ class PasswordExpirationUsersControllerTest < ActionController::TestCase
         session: set_session_user(@user)
     assert_template :password_change_required
     assert @user.reload.password_expired?
+  end
+
+  test 'expired renewal rejects password differing by fewer than four characters' do
+    put :update,
+        params: {
+          id: @user.id,
+          user: {
+            current_password: @password,
+            password: 'Password2!',
+            password_confirmation: 'Password2!'
+          }
+        },
+        session: set_session_user(@user)
+    assert_template :password_change_required
+    assert_match(/at least 4 characters/i, response.body)
+    assert @user.reload.password_expired?
+    assert @user.matching_password?(@password)
   end
 end
 

@@ -1277,7 +1277,7 @@ class UserTest < ActiveSupport::TestCase
     user = FactoryBot.create(:user, :password => "Password1!", :mail => "foo@bar.com")
     as_user user do
       user.current_password = "Password1!"
-      user.password = "NewPass2!"
+      user.password = "CompletelyNew9!"
       assert user.save, user.errors.full_messages.to_sentence
     end
   end

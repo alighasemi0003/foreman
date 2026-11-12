@@ -71,8 +71,8 @@ class UserPasswordExpirationTest < ActiveSupport::TestCase
     Setting[:password_max_age] = 30
     assert @user.password_expired?
 
-    @user.password = 'Password2!'
-    @user.password_confirmation = 'Password2!'
+    @user.password = 'CompletelyNew9!'
+    @user.password_confirmation = 'CompletelyNew9!'
     @user.current_password = @password
     User.current = @user
     assert @user.save, @user.errors.full_messages.to_sentence
@@ -87,8 +87,8 @@ class UserPasswordExpirationTest < ActiveSupport::TestCase
     @user.update_columns(password_changed_at: old)
     Setting[:password_max_age] = 30
 
-    @user.password = 'Password2!'
-    @user.password_confirmation = 'Password2!'
+    @user.password = 'CompletelyNew9!'
+    @user.password_confirmation = 'CompletelyNew9!'
     @user.current_password = 'wrong-current'
     User.current = @user
     refute @user.save
@@ -102,6 +102,9 @@ class UserPasswordExpirationTest < ActiveSupport::TestCase
     old = 5.days.ago.utc
     @user.update_columns(password_changed_at: old)
     Setting[:password_max_age] = 90
+    # Drop in-memory password left by FactoryBot so this is a non-password update.
+    @user.password = nil
+    @user.password_confirmation = nil
     @user.firstname = 'Renamed'
     assert @user.save, @user.errors.full_messages.to_sentence
     assert_in_delta old.to_i, @user.reload.password_changed_at.to_i, 2
