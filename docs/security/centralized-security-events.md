@@ -105,9 +105,13 @@ Search by request id / actor / time: filter JSON lines (`jq 'select(.request_id=
 
 ## Event categories (current branch)
 
-Delivered when emitted by application code: REAUTH_*, HTTP_RATE_LIMIT_*, HTTP_BODY_TOO_LARGE, host info export, JWT/registration invalidation paths, session terminate hooks that already call `SecurityEvent.log`.
+Delivered when emitted by application code: REAUTH_*, `ACCOUNT_LOCKOUT` (F-043), HTTP_RATE_LIMIT_*, HTTP_BODY_TOO_LARGE, host info export, JWT/registration invalidation paths, session terminate hooks that already call `SecurityEvent.log`.
 
 Login success/failure remain primarily in **Audit** / login_events (by design); SecurityEvent does not replace them.
+
+### ACCOUNT_LOCKOUT (F-043)
+
+Emitted once from `UserAccountLockout#register_failed_login!` when an internal user transitions unlocked → locked (`reason_code=failed_password_threshold`). Target is the locked account login; actor is omitted for anonymous failed-password attempts. Compatible with the F-041 forwarder. Search local logs / collector by `event_id=ACCOUNT_LOCKOUT`, `target`, `client_ip`, `request_id`, time.
 
 ## Limitations
 

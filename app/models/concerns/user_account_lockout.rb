@@ -43,6 +43,9 @@ module UserAccountLockout
     return unless internal?
     return unless has_attribute?(:failed_login_attempts)
 
+    # Captured inside the lock after a successful commit of a new lockout transition.
+    lockout_event = nil
+
     with_lock do
       reload
       now = Time.current.utc
@@ -61,7 +64,8 @@ module UserAccountLockout
 
       window = Setting[:account_lockout_window].to_i.minutes
       attempts_limit = Setting[:account_lockout_attempts].to_i
-      duration = Setting[:account_lockout_duration].to_i.minutes
+      duration_minutes = Setting[:account_lockout_duration].to_i
+      duration = duration_minutes.minutes
 
       if failed_login_started_at.nil? || (now - failed_login_started_at.utc) > window
         self.failed_login_attempts = 1
@@ -74,6 +78,12 @@ module UserAccountLockout
       if attempts_limit > 0 && failed_login_attempts >= attempts_limit
         self.locked_until = now + duration
         logger.warn("Account lockout threshold reached for user #{login} (id=#{id}), locked until #{locked_until.utc.iso8601}")
+        lockout_event = {
+          attempts: failed_login_attempts.to_i,
+          attempts_limit: attempts_limit,
+          duration_minutes: duration_minutes,
+          locked_until: locked_until.utc,
+        }
       end
 
       update_columns(
@@ -82,5 +92,36 @@ module UserAccountLockout
         locked_until: locked_until
       )
     end
+
+    # Emit only after columns are committed; never for already-locked retries.
+    # Logging/forwarding failures must not affect lockout enforcement.
+    emit_account_lockout_security_event(lockout_event) if lockout_event
+  end
+
+  private
+
+  # F-043: structured ACCOUNT_LOCKOUT on unlocked → locked transition only.
+  # Target = locked account. Actor is not invented for anonymous failed logins
+  # (the target login is not the attacker identity).
+  def emit_account_lockout_security_event(meta)
+    Foreman::SecurityEvent.log(
+      event: 'ACCOUNT_LOCKOUT',
+      status: 'LOCKED',
+      level: :warn,
+      actor: nil,
+      target: login,
+      operation: 'account.lockout',
+      reason_code: 'failed_password_threshold',
+      details: [
+        "user_id=#{id}",
+        "attempts=#{meta[:attempts]}",
+        "limit=#{meta[:attempts_limit]}",
+        "duration_minutes=#{meta[:duration_minutes]}",
+        "locked_until=#{meta[:locked_until].utc.iso8601}",
+        'source=UserAccountLockout',
+      ].join(' ')
+    )
+  rescue StandardError => e
+    logger.warn("ACCOUNT_LOCKOUT security event failed: #{e.class}") if defined?(logger)
   end
 end

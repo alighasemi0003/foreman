@@ -301,4 +301,91 @@ class UserAccountLockoutTest < ActiveSupport::TestCase
       Rails.cache.delete('failed_login_203.0.113.51')
     end
   end
+
+  # --- F-043 ACCOUNT_LOCKOUT security events ---
+
+  test 'failed attempts below threshold do not emit ACCOUNT_LOCKOUT' do
+    Setting[:account_lockout_attempts] = 5
+    Foreman::SecurityEvent.expects(:log).with(has_entries(event: 'ACCOUNT_LOCKOUT')).never
+
+    4.times { User.try_to_login(@user.login, 'wrong-password') }
+    @user.reload
+    refute @user.account_locked?
+  end
+
+  test 'threshold emits exactly one ACCOUNT_LOCKOUT with target reason IP and duration' do
+    Setting[:account_lockout_attempts] = 3
+    Setting[:account_lockout_duration] = 30
+    ::Logging.mdc['remote_ip'] = '203.0.113.77'
+    ::Logging.mdc['request'] = 'req-lockout-f043'
+    begin
+      Foreman::SecurityEvent.expects(:log).once.with do |kwargs|
+        kwargs[:event] == 'ACCOUNT_LOCKOUT' &&
+          kwargs[:status] == 'LOCKED' &&
+          kwargs[:target] == @user.login &&
+          kwargs[:actor].nil? &&
+          kwargs[:reason_code] == 'failed_password_threshold' &&
+          kwargs[:operation] == 'account.lockout' &&
+          kwargs[:details].to_s.include?("user_id=#{@user.id}") &&
+          kwargs[:details].to_s.include?('attempts=3') &&
+          kwargs[:details].to_s.include?('limit=3') &&
+          kwargs[:details].to_s.include?('duration_minutes=30') &&
+          kwargs[:details].to_s.include?('locked_until=') &&
+          kwargs[:details].to_s.exclude?('wrong-password') &&
+          kwargs[:details].to_s.exclude?('password=')
+      end
+
+      2.times { User.try_to_login(@user.login, 'wrong-password') }
+      assert_nil User.try_to_login(@user.login, 'wrong-password')
+      @user.reload
+      assert @user.account_locked?
+    ensure
+      ::Logging.mdc['remote_ip'] = nil
+      ::Logging.mdc['request'] = nil
+    end
+  end
+
+  test 'additional failures while locked do not emit another ACCOUNT_LOCKOUT' do
+    Setting[:account_lockout_attempts] = 2
+    2.times { User.try_to_login(@user.login, 'wrong-password') }
+    @user.reload
+    assert @user.account_locked?
+
+    Foreman::SecurityEvent.expects(:log).with(has_entries(event: 'ACCOUNT_LOCKOUT')).never
+    3.times { assert_nil User.try_to_login(@user.login, 'wrong-password') }
+    assert_nil User.try_to_login(@user.login, @password)
+  end
+
+  test 'unknown username does not emit ACCOUNT_LOCKOUT' do
+    Foreman::SecurityEvent.expects(:log).with(has_entries(event: 'ACCOUNT_LOCKOUT')).never
+    assert_nil User.try_to_login('missing-user-f043-xyz', 'whatever')
+  end
+
+  test 'concurrent failures emit a single ACCOUNT_LOCKOUT transition event' do
+    Setting[:account_lockout_attempts] = 5
+    calls = []
+    Foreman::SecurityEvent.stubs(:log).with do |kwargs|
+      calls << kwargs if kwargs[:event] == 'ACCOUNT_LOCKOUT'
+      true
+    end
+
+    instances = Array.new(5) { User.unscoped.find(@user.id) }
+    instances.each(&:register_failed_login!)
+
+    @user.reload
+    assert @user.account_locked?
+    assert_equal 1, calls.size
+    assert_equal @user.login, calls.first[:target]
+    assert_equal 'failed_password_threshold', calls.first[:reason_code]
+  end
+
+  test 'ACCOUNT_LOCKOUT security event failure does not unlock or bypass lockout' do
+    Setting[:account_lockout_attempts] = 2
+    Foreman::SecurityEvent.stubs(:log).raises(StandardError.new('collector boom'))
+
+    2.times { User.try_to_login(@user.login, 'wrong-password') }
+    @user.reload
+    assert @user.account_locked?
+    assert_nil User.try_to_login(@user.login, @password)
+  end
 end
