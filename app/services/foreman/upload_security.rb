@@ -21,6 +21,11 @@ module Foreman
     # Config reports with logs are often larger than templates but same order.
     MAX_CONFIG_REPORT_BODY_BYTES = 10.megabytes
 
+    # Global HTTP request body default (F-028). Covers API/JSON/GraphQL/forms and
+    # template multipart (MAX_TEMPLATE_BYTES + overhead). Facts/reports use the
+    # larger limits below via path-based exceptions in RequestBodyLimit.
+    MAX_DEFAULT_REQUEST_BODY_BYTES = 2.megabytes
+
     # CA bundles (multiple PEMs) — below Mozilla store size with headroom.
     # Content parsing remains Foreman::Util / CacertValidator (OpenSSL).
     MAX_CACERT_BYTES = 256.kilobytes
@@ -104,6 +109,19 @@ module Foreman
         end
       end
       false
+    end
+
+    # Path-aware limit for Rack middleware (F-028). Facts/reports keep 10 MB;
+    # everything else uses the default 2 MB ceiling.
+    def request_body_limit_for(path)
+      path = path.to_s
+      if path.match?(%r{\A/api(/v2)?/hosts/facts\z}i)
+        MAX_FACTS_BODY_BYTES
+      elsif path.match?(%r{\A/api(/v2)?/(config_)?reports\z}i)
+        MAX_CONFIG_REPORT_BODY_BYTES
+      else
+        ENV.fetch('FOREMAN_MAX_REQUEST_BODY_BYTES', MAX_DEFAULT_REQUEST_BODY_BYTES.to_s).to_i
+      end
     end
 
     # Sanitize Content-Disposition filenames only (not storage paths).

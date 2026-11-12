@@ -250,6 +250,11 @@ module Foreman
     # Reject TRACE/TRACK/CONNECT/WebDAV and other non-application HTTP methods early.
     config.middleware.insert_before 0, Foreman::Middleware::RejectUnsafeHttpMethods
 
+    # F-028: bound request body size (Content-Length + streamed read limit).
+    config.middleware.insert_after Foreman::Middleware::RejectUnsafeHttpMethods,
+      Foreman::Middleware::RequestBodyLimit
+    config.action_dispatch.rescue_responses['Foreman::HttpBodyTooLarge'] = :payload_too_large
+
     # F-026: HTTP/API rate limits (Rails.cache / Redis). After RemoteIp so client IP
     # follows trusted_proxies — never raw X-Forwarded-For alone.
     config.middleware.insert_after ActionDispatch::RemoteIp, Foreman::Middleware::HttpRateLimit

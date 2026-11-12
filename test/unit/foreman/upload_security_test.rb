@@ -80,4 +80,13 @@ class Foreman::UploadSecurityTest < ActiveSupport::TestCase
     request.stubs(:content_length).returns(100)
     refute Foreman::UploadSecurity.request_body_too_large?(request, Foreman::UploadSecurity::MAX_FACTS_BODY_BYTES)
   end
+
+  test 'request_body_limit_for selects facts reports and default' do
+    assert_equal Foreman::UploadSecurity::MAX_FACTS_BODY_BYTES,
+      Foreman::UploadSecurity.request_body_limit_for('/api/v2/hosts/facts')
+    assert_equal Foreman::UploadSecurity::MAX_CONFIG_REPORT_BODY_BYTES,
+      Foreman::UploadSecurity.request_body_limit_for('/api/v2/config_reports')
+    assert_equal Foreman::UploadSecurity::MAX_DEFAULT_REQUEST_BODY_BYTES,
+      Foreman::UploadSecurity.request_body_limit_for('/api/graphql')
+  end
 end

@@ -15,6 +15,11 @@ state_permission 0o0640
 puma_max_threads = ENV.fetch('FOREMAN_PUMA_THREADS_MAX') { ENV.fetch('RAILS_MAX_THREADS', '16') }.to_i
 threads ENV.fetch('FOREMAN_PUMA_THREADS_MIN', 0).to_i, puma_max_threads
 
+# F-028: hard ceiling compared to Content-Length (and body size when CL absent).
+# Must be >= largest path exception (facts/reports = 10 MiB). Tighter per-path
+# limits are enforced by Foreman::Middleware::RequestBodyLimit (default 2 MiB).
+http_content_length_limit ENV.fetch('FOREMAN_ABSOLUTE_MAX_REQUEST_BODY_BYTES', (10 * 1024 * 1024).to_s).to_i
+
 # === Cluster mode ===
 
 # How many worker processes to run.
