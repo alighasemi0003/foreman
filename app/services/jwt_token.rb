@@ -2,10 +2,13 @@ require 'jwt'
 require 'base64'
 
 class JwtToken < Struct.new(:token)
+  # Foreman user JWTs are HMAC-signed with the per-user JwtSecret (symmetric).
+  ALGORITHM = 'HS256'
+
   class << self
     def encode(user, secret, expiration: nil, scope: [])
       payload = prepare_payload(user, secret, expiration: expiration, scope: scope)
-      new JWT.encode(payload, secret)
+      new JWT.encode(payload, secret, ALGORITHM)
     end
 
     private
@@ -34,14 +37,17 @@ class JwtToken < Struct.new(:token)
     end
   end
 
+  # Cryptographically verified decode. This is the only payload that may be
+  # trusted for authentication or authorization.
   def decode
     return nil if token.blank?
     return nil if secret.blank?
 
-    payload = JWT.decode(token, secret.token)
+    payload = JWT.decode(token, secret.token, true, { algorithm: ALGORITHM })
     payload.first
   rescue JWT::DecodeError
-    # Includes VerificationError when the per-user signing secret was rotated/invalidated.
+    # Includes VerificationError / IncorrectAlgorithm when the secret was
+    # rotated/invalidated or the token was tampered / used an unexpected alg.
     nil
   end
 
@@ -49,16 +55,15 @@ class JwtToken < Struct.new(:token)
     token
   end
 
-  # This method does not verify if the token signature is valid
-  # defined? keyword checks if expression is currently defined. It
-  # therefore, helps to memoize the nil JWT values.
+  # Inspection-only decode (signature NOT verified). Used solely to read
+  # user_id so the correct per-user JwtSecret can be loaded before #decode.
+  # Never use this payload for identity, scope, or authorization decisions.
   def decoded_payload
     return @decoded_payload if defined?(@decoded_payload)
     @decoded_payload = JWT.decode(token, nil, false).first
 
     unless @decoded_payload.is_a?(Hash)
       Rails.logger.error "Invalid decoded JWT format."
-      Rails.logger.debug "Received payload: #{@decoded_payload}"
       @decoded_payload = nil
     end
     @decoded_payload
@@ -72,6 +77,7 @@ class JwtToken < Struct.new(:token)
   def secret
     return @secret if defined? @secret
     # user_id comes from the (unverified) payload; look up the signing secret by id.
+    # Trust is established only after #decode verifies the signature with this secret.
     @secret = user_id.present? ? JwtSecret.find_by(user_id: user_id) : nil
   end
 

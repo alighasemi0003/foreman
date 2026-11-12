@@ -4,11 +4,12 @@ module ForemanRegister
   class RegistrationToken
     VALID_BEFORE_ISSUING = 3600
     EXPIRE_AFTER_ISSUING = 24 * 3600
+    ALGORITHM = 'HS256'
 
     class << self
       def encode(host, secret)
         payload = prepare_payload(host, secret)
-        new JWT.encode(payload, secret)
+        new JWT.encode(payload, secret, ALGORITHM)
       end
 
       private
@@ -42,11 +43,12 @@ module ForemanRegister
       @token = token
     end
 
+    # Cryptographically verified decode — only this payload may authorize registration.
     def decode
       return nil if token.blank?
       return nil if secret.blank?
 
-      payload = JWT.decode(token, secret)
+      payload = JWT.decode(token, secret, true, { algorithm: ALGORITHM })
       payload.first
     end
 
@@ -69,9 +71,9 @@ module ForemanRegister
     end
 
     def unsecure_payload
-      # This does not validate the token secret to extract the host id so we can find the
-      # corresponding jwt secret. We store an individual secret for every host so we can
-      # revoke the issued tokens by changing the secret.
+      # Inspection-only: extract host_id to locate the host-scoped jwt_secret.
+      # Signature verification happens in #decode with that secret — do not trust
+      # these claims for authorization.
       @unsecure_payload ||= JWT.decode(token, nil, false).first
     end
   end

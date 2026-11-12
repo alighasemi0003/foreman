@@ -85,4 +85,46 @@ class JwtTokenTest < ActiveSupport::TestCase
 
     assert_nil jwt_token.decode
   end
+
+  test 'decoded_payload is inspection-only and does not authenticate tampered tokens' do
+    jwt_secret = FactoryBot.build(:jwt_secret, token: 'test_jwt_secret', user_id: 123)
+    JwtSecret.stubs(:find_by).with(user_id: 123).returns(jwt_secret)
+
+    # Forge unsigned / alg:none token claiming user_id 123
+    header = Base64.urlsafe_encode64({ alg: 'none', typ: 'JWT' }.to_json, padding: false)
+    body = Base64.urlsafe_encode64({ user_id: 123, iat: Time.now.to_i }.to_json, padding: false)
+    none_token = "#{header}.#{body}."
+
+    jwt = JwtToken.new(none_token)
+    assert_equal 123, jwt.decoded_payload['user_id']
+    assert_nil jwt.decode, 'alg:none must not verify'
+  end
+
+  test 'tampered payload fails verification' do
+    jwt_secret = FactoryBot.build(:jwt_secret, token: 'test_jwt_secret', user_id: 123)
+    JwtSecret.stubs(:find_by).returns(jwt_secret)
+    raw = JwtToken.encode(OpenStruct.new(id: 123), jwt_secret.token).to_s
+    parts = raw.split('.')
+    payload = JSON.parse(Base64.urlsafe_decode64(parts[1] + '=='))
+    payload['user_id'] = 999
+    parts[1] = Base64.urlsafe_encode64(payload.to_json, padding: false)
+    tampered = parts.join('.')
+
+    jwt = JwtToken.new(tampered)
+    # Inspection may still show forged user_id; verified decode must fail.
+    assert_nil jwt.decode
+  end
+
+  test 'unexpected algorithm fails verification' do
+    jwt_secret = FactoryBot.build(:jwt_secret, token: 'test_jwt_secret', user_id: 123)
+    JwtSecret.stubs(:find_by).returns(jwt_secret)
+    foreign = JWT.encode({ 'user_id' => 123, 'iat' => Time.now.to_i }, jwt_secret.token, 'HS384')
+    assert_nil JwtToken.new(foreign).decode
+  end
+
+  test 'encode uses HS256' do
+    raw = JwtToken.encode(OpenStruct.new(id: 1), 'abc').to_s
+    header = JSON.parse(Base64.urlsafe_decode64(raw.split('.').first + '=='))
+    assert_equal 'HS256', header['alg']
+  end
 end

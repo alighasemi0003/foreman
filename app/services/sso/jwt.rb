@@ -7,7 +7,11 @@ module SSO
     end
 
     def authenticate!
-      payload = jwt_token.decode || {}
+      # Identity and scope MUST come from JwtToken#decode (signature verified).
+      # Never authorize from JwtToken#decoded_payload (inspection-only).
+      payload = jwt_token.decode
+      return if payload.blank?
+
       user_id = payload['user_id']
 
       unless valid_scope?(payload['scope'])
@@ -48,13 +52,15 @@ module SSO
     end
 
     def no_issuer?
-      jwt_token.decoded_payload.present? && !jwt_token.decoded_payload.key?('iss')
+      # Routing hint only (unverified). Tokens with iss are handled by OpenID Connect SSO.
+      payload = jwt_token.decoded_payload
+      payload.present? && !payload.key?('iss')
     end
 
     def valid_scope?(scope)
-      return true if scope.empty?
+      return true if scope.blank?
       required_scope = "#{controller.controller_permission}##{controller.action_name}"
-      scope.split(' ').include? required_scope
+      scope.to_s.split(' ').include? required_scope
     end
   end
 end

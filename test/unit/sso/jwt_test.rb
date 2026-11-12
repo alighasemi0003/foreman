@@ -60,6 +60,42 @@ class JwtTest < ActiveSupport::TestCase
         assert_nil sso.current_user
       end
     end
+
+    context 'with alg none token claiming a real user' do
+      let(:token) do
+        header = Base64.urlsafe_encode64({ alg: 'none', typ: 'JWT' }.to_json, padding: false)
+        body = Base64.urlsafe_encode64({ user_id: users(:one).id, iat: Time.now.to_i }.to_json, padding: false)
+        "#{header}.#{body}."
+      end
+
+      test '#authenticate! rejects unsigned token' do
+        users(:one).jwt_secret!
+        assert_nil sso.authenticated?
+        assert_nil sso.current_user
+      end
+    end
+
+    context 'with expired token' do
+      let(:token) { users(:one).jwt_token!(expiration: -60) }
+
+      test '#authenticate! rejects expired token' do
+        assert_nil sso.authenticated?
+        assert_nil sso.current_user
+      end
+    end
+
+    context 'with modified signature' do
+      let(:token) do
+        raw = users(:one).jwt_token!
+        parts = raw.split('.')
+        parts[2] = parts[2].reverse
+        parts.join('.')
+      end
+
+      test '#authenticate! rejects bad signature' do
+        assert_nil sso.authenticated?
+      end
+    end
   end
 
   context 'no api request' do
