@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative 'security_event/payload'
+require_relative 'security_event/forwarder'
+
 module Foreman
   # Central security-event logging: Actor, IP, timestamp (via logger), Action, Status.
   # Request ID comes from Logging MDC when present.
@@ -7,6 +10,9 @@ module Foreman
   # Complementary to Foreman 5.0 Audit.manual_event! login/logout/failed_login entries.
   # Prefer SecurityEvent for reauthentication lifecycle (REAUTH_*) rather than duplicating
   # upstream interactive login Audits.
+  #
+  # F-041: also builds a structured JSON payload and best-effort forwards it to an
+  # external collector when FOREMAN_SECURITY_EVENTS_ENABLED=true.
   module SecurityEvent
     module_function
 
@@ -27,14 +33,19 @@ module Foreman
     # @param status [String] SUCCESS / FAILURE / DENIED / LOCKED / UNLOCKED / UNSUPPORTED
     # @param level [Symbol] :info or :warn
     # @param actor [String, nil] username/login
+    # @param actor_id [Integer, nil]
     # @param ip [String, nil]
     # @param target [String, nil] resource description
     # @param details [String, nil] extra free-text (sanitized)
-    def log(event:, status:, level: :info, actor: nil, ip: nil, target: nil, details: nil)
+    # @param operation [String, nil]
+    # @param reason_code [String, nil]
+    def log(event:, status:, level: :info, actor: nil, actor_id: nil, ip: nil, target: nil,
+             details: nil, operation: nil, reason_code: nil)
       actor_s = sanitize(actor)
       ip_s = sanitize(ip.presence || current_ip)
       target_s = sanitize(target)
-      details_s = sanitize(details)
+      # Scrub secrets for both local logs and the central collector payload.
+      details_s = Payload.scrub_details(details)
       request_id = current_request_id
 
       fields = {
@@ -56,6 +67,29 @@ module Foreman
       Foreman::Logging.with_fields(fields) do
         Rails.logger.public_send(level, message)
       end
+
+      payload = Payload.build(
+        event: event,
+        status: status,
+        actor: actor_s,
+        actor_id: actor_id,
+        target: target_s,
+        ip: ip_s,
+        details: details_s,
+        operation: operation,
+        reason_code: reason_code,
+        request_id: request_id
+      )
+      Forwarder.enqueue(payload)
+      payload
+    rescue StandardError => e
+      # Local logging / forwarding must never break the request path.
+      begin
+        Rails.logger.warn("SecurityEvent.log failed: #{e.class}") if defined?(Rails)
+      rescue StandardError
+        nil
+      end
+      nil
     end
   end
 end
