@@ -31,7 +31,7 @@ module EncryptValue
   def encrypt_field(str)
     return str if str.blank? || matches_prefix?(str)
 
-    # Fail closed: never silently persist secrets as plaintext when no key is configured.
+    # Fail closed: never silently persist secrets as plaintext when encryption cannot succeed.
     unless encryption_key.present?
       puts_and_logs("ENCRYPTION_KEY is not configured; refusing to store secret plaintext")
       raise Foreman::Exception.new(N_("ENCRYPTION_KEY is not configured; cannot store secrets"))
@@ -39,15 +39,17 @@ module EncryptValue
 
     begin
       # add prefix to encrypted string
-      str_encrypted = "#{ENCRYPTION_PREFIX}#{encryptor.encrypt_and_sign(str)}"
-      str = str_encrypted
+      "#{ENCRYPTION_PREFIX}#{encryptor.encrypt_and_sign(str)}"
     rescue Foreman::Exception
       raise
-    rescue => e
-      puts_and_logs("At least one field encryption failed: #{e}") unless defined?(@@encrypt_err_reported) && @@encrypt_err_reported
-      @@encrypt_err_reported = true
+    rescue StandardError => e
+      # Log class only — never echo exception messages that might include secret material.
+      unless defined?(@@encrypt_err_reported) && @@encrypt_err_reported
+        puts_and_logs("At least one field encryption failed (#{e.class}); refusing plaintext storage")
+        @@encrypt_err_reported = true
+      end
+      raise Foreman::Exception.new(N_("Secret encryption failed; cannot store secrets"))
     end
-    str
   end
 
   def decrypt_field(str)

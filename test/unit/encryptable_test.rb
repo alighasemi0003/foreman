@@ -99,14 +99,84 @@ class EncryptableTest < ActiveSupport::TestCase
     assert compute_resource.is_decryptable?(encrypted_str)
   end
 
-  test "encrypt unsuccessfully logs error once" do
+  test "encrypt unsuccessfully refuses plaintext and logs once" do
     EncryptValue.reset_warnings
     compute_resource = cr_with_encryption_key
-    ActiveSupport::MessageEncryptor.any_instance.expects(:encrypt_and_sign).twice.raises('Encryption error')
+    ActiveSupport::MessageEncryptor.any_instance.stubs(:encrypt_and_sign).raises(StandardError, 'Encryption error')
     compute_resource.expects(:puts_and_logs).once
-    encrypted_str = compute_resource.encrypt_field('secret')
-    assert_equal 'secret', encrypted_str
-    compute_resource.encrypt_field('secret')
+    err = assert_raises(Foreman::Exception) { compute_resource.encrypt_field('secretpassword') }
+    refute_includes err.message, 'secretpassword'
+    refute_includes err.message, 'Encryption error'
+    # second failure still raises; warning logged only once
+    assert_raises(Foreman::Exception) { compute_resource.encrypt_field('secretpassword') }
+  end
+
+  test "valid key encrypts and decrypts roundtrip" do
+    compute_resource = cr_with_encryption_key
+    plain = 'synthetic-f005-roundtrip'
+    encrypted = compute_resource.encrypt_field(plain)
+    assert compute_resource.matches_prefix?(encrypted)
+    assert_equal plain, compute_resource.decrypt_field(encrypted)
+  end
+
+  test "missing key rejects sensitive save" do
+    cr = FactoryBot.build(:ec2_cr, password: 'synthetic-f005-missing-key')
+    cr.stubs(:encryption_key).returns(nil)
+    assert_raises(Foreman::Exception) { cr.save! }
+    refute cr.persisted?
+  end
+
+  test "encryption exception rejects sensitive save" do
+    cr = FactoryBot.build(:ec2_cr, password: 'synthetic-f005-encrypt-fail')
+    stub_encryption_key(cr)
+    ActiveSupport::MessageEncryptor.any_instance.stubs(:encrypt_and_sign).raises(StandardError, 'encrypt boom')
+    assert_raises(Foreman::Exception) { cr.save! }
+    refute cr.persisted?
+  end
+
+  test "failed encryption leaves database unchanged" do
+    compute_resource = cr_with_encryption_key
+    assert compute_resource.save!
+    orig_in_db = compute_resource.reload.password_in_db
+    assert compute_resource.matches_prefix?(orig_in_db)
+
+    ActiveSupport::MessageEncryptor.any_instance.stubs(:encrypt_and_sign).raises(StandardError, 'encrypt boom')
+    compute_resource.password = 'synthetic-f005-should-not-persist'
+    assert_raises(Foreman::Exception) { compute_resource.save! }
+    assert_equal orig_in_db, compute_resource.reload.password_in_db
+  end
+
+  test "already encrypted value is not double-encrypted" do
+    compute_resource = cr_with_encryption_key
+    once = compute_resource.encrypt_field('synthetic-f005-once')
+    twice = compute_resource.encrypt_field(once)
+    assert_equal once, twice
+    assert_equal 1, twice.to_s.scan(EncryptValue::ENCRYPTION_PREFIX).length
+  end
+
+  test "updating unrelated attributes does not corrupt encrypted password" do
+    compute_resource = cr_with_encryption_key
+    assert compute_resource.save!
+    orig_in_db = compute_resource.reload.password_in_db
+    compute_resource.name = "#{compute_resource.name}-f005"
+    assert compute_resource.save!
+    assert_equal orig_in_db, compute_resource.reload.password_in_db
+    assert_equal compute_resource.decrypt_field(orig_in_db), compute_resource.password
+  end
+
+  test "encryption failure messages omit plaintext secrets" do
+    EncryptValue.reset_warnings
+    compute_resource = cr_with_encryption_key
+    ActiveSupport::MessageEncryptor.any_instance.stubs(:encrypt_and_sign).raises(StandardError, 'leak-synthetic-f005')
+    logged = []
+    compute_resource.stubs(:puts_and_logs).with { |msg| logged << msg; true }
+    err = assert_raises(Foreman::Exception) { compute_resource.encrypt_field('synthetic-f005-log-check') }
+    refute_includes err.message, 'synthetic-f005-log-check'
+    refute_includes err.message, 'leak-synthetic-f005'
+    logged.each do |msg|
+      refute_includes msg, 'synthetic-f005-log-check'
+      refute_includes msg, 'leak-synthetic-f005'
+    end
   end
 
   test "decrypt successfully" do
