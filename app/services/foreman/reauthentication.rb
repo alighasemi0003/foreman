@@ -4,39 +4,222 @@ module Foreman
   # Step-up authentication for sensitive interactive-session actions.
   # Recent-auth state lives in the Rails session (session-bound + actor-bound).
   # Never call User.try_to_login from this module.
+  #
+  # F-011: administrators may toggle only *registered configurable* operations via
+  # Administer → Settings → "Re-authentication policy". Arbitrary controller/URL
+  # registration is rejected. Mandatory operations cannot be disabled.
   module Reauthentication
     SESSION_AT = :reauthenticated_at
     SESSION_ACTOR = :reauth_actor_id
 
-    # Canonical action key => Setting name (boolean). Meta policy is hardcoded.
-    ACTION_SETTINGS = {
-      'users.set_admin' => 'require_reauth_users_set_admin',
-      'users.set_disabled' => 'require_reauth_users_set_disabled',
-      'users.impersonate' => 'require_reauth_users_impersonate',
-      'auth_sources.update' => 'require_reauth_auth_sources_update',
-      # Phase 2
-      'users.destroy' => 'require_reauth_users_destroy',
-      'users.change_password' => 'require_reauth_users_change_password',
-      'users.change_roles' => 'require_reauth_users_change_roles',
-      'auth_sources.create' => 'require_reauth_auth_sources_create',
-      'auth_sources.destroy' => 'require_reauth_auth_sources_destroy',
-      'users.terminate_sessions' => 'require_reauth_users_terminate_sessions',
-      'users.invalidate_jwt' => 'require_reauth_users_invalidate_jwt',
-      # Phase 3A
-      'users.create' => 'require_reauth_users_create',
-      'personal_access_tokens.create' => 'require_reauth_personal_access_tokens_create',
-      'personal_access_tokens.revoke' => 'require_reauth_personal_access_tokens_revoke',
-      # Phase 3B
-      'ssh_keys.create' => 'require_reauth_ssh_keys_create',
-      'ssh_keys.destroy' => 'require_reauth_ssh_keys_destroy',
-      'registration_commands.create' => 'require_reauth_registration_commands_create',
-      'key_pairs.download' => 'require_reauth_key_pairs_download',
-      'key_pairs.recreate' => 'require_reauth_key_pairs_recreate',
-      'key_pairs.destroy' => 'require_reauth_key_pairs_destroy',
-      # Console opens may embed short-lived VNC/SPICE display credentials in HTML.
-      'hosts.console' => 'require_reauth_hosts_console',
-      'compute_resources_vms.console' => 'require_reauth_compute_resources_vms_console',
-    }.freeze
+    Operation = Struct.new(
+      :key, :label, :description, :setting_name, :mandatory, :default_enabled,
+      keyword_init: true
+    )
+
+    META_ACTION_KEY = 'settings.reauthentication.update'
+    OAUTH_CREDENTIALS_ACTION_KEY = 'settings.oauth_credentials.update'
+
+    # Closed server-side registry. Unknown keys are never introduced by Settings.
+    OPERATIONS = [
+      Operation.new(
+        key: META_ACTION_KEY,
+        label: N_('Update re-authentication policy'),
+        description: N_('Changing the re-authentication window or any require_reauth_* toggle. Always required; cannot be disabled.'),
+        setting_name: 'require_reauth_settings_reauthentication_policy',
+        mandatory: true,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: OAUTH_CREDENTIALS_ACTION_KEY,
+        label: N_('Update OAuth API credentials'),
+        description: N_('Changing oauth_consumer_key or oauth_consumer_secret. Always required; cannot be disabled.'),
+        setting_name: 'require_reauth_settings_oauth_credentials',
+        mandatory: true,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.set_admin',
+        label: N_('Change user administrator flag'),
+        description: N_('Granting or revoking the administrator flag on a user.'),
+        setting_name: 'require_reauth_users_set_admin',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.set_disabled',
+        label: N_('Enable or disable a user'),
+        description: N_('Enabling or disabling a user account.'),
+        setting_name: 'require_reauth_users_set_disabled',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.impersonate',
+        label: N_('Impersonate a user'),
+        description: N_('Impersonating another user.'),
+        setting_name: 'require_reauth_users_impersonate',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'auth_sources.update',
+        label: N_('Update authentication source'),
+        description: N_('Updating an authentication source (for example LDAP).'),
+        setting_name: 'require_reauth_auth_sources_update',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.destroy',
+        label: N_('Delete a user'),
+        description: N_('Deleting a user account.'),
+        setting_name: 'require_reauth_users_destroy',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.change_password',
+        label: N_('Change another user password'),
+        description: N_('Changing another user\'s password (administrator reset).'),
+        setting_name: 'require_reauth_users_change_password',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.change_roles',
+        label: N_('Change user roles'),
+        description: N_('Changing user role membership or role/filter definitions.'),
+        setting_name: 'require_reauth_users_change_roles',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'auth_sources.create',
+        label: N_('Create authentication source'),
+        description: N_('Creating an authentication source.'),
+        setting_name: 'require_reauth_auth_sources_create',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'auth_sources.destroy',
+        label: N_('Delete authentication source'),
+        description: N_('Deleting an authentication source.'),
+        setting_name: 'require_reauth_auth_sources_destroy',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.terminate_sessions',
+        label: N_('Terminate user sessions'),
+        description: N_('Terminating interactive user sessions.'),
+        setting_name: 'require_reauth_users_terminate_sessions',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.invalidate_jwt',
+        label: N_('Invalidate registration JWTs'),
+        description: N_('Invalidating user registration JWTs.'),
+        setting_name: 'require_reauth_users_invalidate_jwt',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'users.create',
+        label: N_('Create a user'),
+        description: N_('Creating a user account.'),
+        setting_name: 'require_reauth_users_create',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'personal_access_tokens.create',
+        label: N_('Create personal access token'),
+        description: N_('Creating a personal access token.'),
+        setting_name: 'require_reauth_personal_access_tokens_create',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'personal_access_tokens.revoke',
+        label: N_('Revoke personal access token'),
+        description: N_('Revoking a personal access token.'),
+        setting_name: 'require_reauth_personal_access_tokens_revoke',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'ssh_keys.create',
+        label: N_('Create SSH key'),
+        description: N_('Adding an SSH public key to a user.'),
+        setting_name: 'require_reauth_ssh_keys_create',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'ssh_keys.destroy',
+        label: N_('Delete SSH key'),
+        description: N_('Deleting a user SSH public key.'),
+        setting_name: 'require_reauth_ssh_keys_destroy',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'registration_commands.create',
+        label: N_('Generate registration command'),
+        description: N_('Generating a host registration command (issues a registration JWT).'),
+        setting_name: 'require_reauth_registration_commands_create',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'key_pairs.download',
+        label: N_('Download compute SSH private key'),
+        description: N_('Downloading a compute resource SSH private key (PEM).'),
+        setting_name: 'require_reauth_key_pairs_download',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'key_pairs.recreate',
+        label: N_('Recreate compute SSH key pair'),
+        description: N_('Recreating a compute resource SSH key pair.'),
+        setting_name: 'require_reauth_key_pairs_recreate',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'key_pairs.destroy',
+        label: N_('Delete compute SSH key'),
+        description: N_('Deleting a compute resource SSH key.'),
+        setting_name: 'require_reauth_key_pairs_destroy',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'hosts.console',
+        label: N_('Open host console'),
+        description: N_('Opening a host console (VNC/SPICE may embed a short-lived display password).'),
+        setting_name: 'require_reauth_hosts_console',
+        mandatory: false,
+        default_enabled: true
+      ),
+      Operation.new(
+        key: 'compute_resources_vms.console',
+        label: N_('Open compute resource VM console'),
+        description: N_('Opening a compute resource VM console.'),
+        setting_name: 'require_reauth_compute_resources_vms_console',
+        mandatory: false,
+        default_enabled: true
+      ),
+    ].freeze
+
+    OPERATIONS_BY_KEY = OPERATIONS.index_by(&:key).freeze
+
+    # Canonical action key => Setting name for *configurable* (non-mandatory) ops.
+    ACTION_SETTINGS = OPERATIONS.reject(&:mandatory).to_h { |op| [op.key, op.setting_name] }.freeze
 
     # Settings that always require reauth (no toggle) — OAuth API credentials.
     ALWAYS_REAUTH_SETTING_NAMES = %w[
@@ -44,19 +227,61 @@ module Foreman
       oauth_consumer_secret
     ].freeze
 
-    META_ACTION_KEY = 'settings.reauthentication.update'
-    OAUTH_CREDENTIALS_ACTION_KEY = 'settings.oauth_credentials.update'
+    ALWAYS_ON_ACTION_KEYS = OPERATIONS.select(&:mandatory).map(&:key).freeze
 
-    ALWAYS_ON_ACTION_KEYS = [
-      META_ACTION_KEY,
-      OAUTH_CREDENTIALS_ACTION_KEY,
-    ].freeze
+    MANDATORY_SETTING_NAMES = OPERATIONS.select(&:mandatory).map(&:setting_name).freeze
 
     META_SETTING_NAMES = (
-      ['reauthentication_window_minutes'] + ACTION_SETTINGS.values
+      ['reauthentication_window_minutes'] + OPERATIONS.map(&:setting_name)
     ).freeze
 
+    SETTINGS_CATEGORY = 'reauthentication'
+
     module_function
+
+    def operations
+      OPERATIONS
+    end
+
+    def operation(key)
+      OPERATIONS_BY_KEY[key.to_s]
+    end
+
+    def registered_operation?(key)
+      OPERATIONS_BY_KEY.key?(key.to_s)
+    end
+
+    def mandatory_operation?(key)
+      op = operation(key)
+      op&.mandatory || false
+    end
+
+    def mandatory_setting?(name)
+      MANDATORY_SETTING_NAMES.include?(name.to_s)
+    end
+
+    # Effective policy for UI/API inventory: :mandatory_enabled, :enabled, :disabled
+    def effective_policy(action_key)
+      return :unknown unless registered_operation?(action_key)
+      return :mandatory_enabled if mandatory_operation?(action_key)
+
+      policy_enabled?(action_key) ? :enabled : :disabled
+    end
+
+    def policy_inventory
+      OPERATIONS.map do |op|
+        {
+          key: op.key,
+          label: _(op.label),
+          description: _(op.description),
+          setting_name: op.setting_name,
+          mandatory: op.mandatory,
+          default_enabled: op.default_enabled,
+          effective: effective_policy(op.key),
+          enabled: policy_enabled?(op.key),
+        }
+      end
+    end
 
     def real_actor_id(session)
       (session[:impersonated_by].presence || session[:user]).presence&.to_i
@@ -73,14 +298,17 @@ module Foreman
       session[:user].present? && !session[:api_authenticated_session]
     end
 
-    # Fail-secure: only explicit false disables a toggleable action policy.
+    # Fail-secure: only explicit false disables a *configurable* action policy.
+    # Mandatory and unknown registered-missing keys remain enabled.
     def policy_enabled?(action_key)
-      return true if ALWAYS_ON_ACTION_KEYS.include?(action_key)
+      key = action_key.to_s
+      return true if ALWAYS_ON_ACTION_KEYS.include?(key)
 
-      setting_name = ACTION_SETTINGS[action_key]
-      return true if setting_name.blank?
+      op = operation(key)
+      return true if op.nil? # unknown guard key → require reauth (fail closed)
+      return true if op.mandatory
 
-      Setting[setting_name] != false
+      Setting[op.setting_name] != false
     rescue StandardError
       true
     end

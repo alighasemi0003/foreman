@@ -123,6 +123,11 @@ class SettingRegistry
   def set_user_value(name, value)
     definition = find(name)
     raise ActiveRecord::RecordNotFound.new(_("Setting definition for '%s' not found, can not set") % name, Setting, name) unless definition
+    if defined?(Foreman::Reauthentication) && Foreman::Reauthentication.mandatory_setting?(name)
+      raise ::Foreman::SettingValueException.new(
+        N_('This re-authentication protection is mandatory and cannot be disabled')
+      )
+    end
     db_record = _find_or_new_db_record(name)
 
     type = value.class.to_s.downcase

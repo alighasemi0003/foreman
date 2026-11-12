@@ -251,8 +251,11 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("The algorithm used to encode the JWT in the OpenID provider."),
       default: nil,
       full_name: N_('OIDC Algorithm'))
+  end
 
-    # Step-up / re-authentication (policy infrastructure; sensitive-action enforcement is later)
+  # F-011: closed registry of sensitive operations — Administer → Settings →
+  # "Re-authentication policy". Arbitrary paths cannot be registered here.
+  category(:reauthentication, N_('Re-authentication policy')) do
     setting('reauthentication_window_minutes',
       type: :integer,
       description: N_("How long in minutes a successful re-authentication remains valid for sensitive actions in the same browser session. Changing this setting always requires re-authentication."),
@@ -262,114 +265,134 @@ Foreman::SettingManager.define(:foreman) do
       ->(value) { value.to_i.between?(1, 30) },
       message: N_("must be between 1 and 30"))
 
+    # Mandatory (locked): shown in UI as read-only; cannot be disabled.
+    setting('require_reauth_settings_reauthentication_policy',
+      type: :boolean,
+      description: N_("Mandatory operation settings.reauthentication.update — changing re-authentication policy always requires re-authentication. This protection cannot be disabled."),
+      default: true,
+      full_name: N_('Require re-authentication to update reauth policy (mandatory)'))
+    validates('require_reauth_settings_reauthentication_policy',
+      ->(value) { ActiveModel::Type::Boolean.new.cast(value) == true },
+      message: N_("is mandatory and cannot be disabled"))
+
+    setting('require_reauth_settings_oauth_credentials',
+      type: :boolean,
+      description: N_("Mandatory operation settings.oauth_credentials.update — changing OAuth consumer key/secret always requires re-authentication. This protection cannot be disabled."),
+      default: true,
+      full_name: N_('Require re-authentication to update OAuth credentials (mandatory)'))
+    validates('require_reauth_settings_oauth_credentials',
+      ->(value) { ActiveModel::Type::Boolean.new.cast(value) == true },
+      message: N_("is mandatory and cannot be disabled"))
+
+    # Configurable registered operations (defaults enabled).
     setting('require_reauth_users_set_admin',
       type: :boolean,
-      description: N_("Require re-authentication before granting or revoking the administrator flag on a user"),
+      description: N_("Operation users.set_admin — require re-authentication before granting or revoking the administrator flag on a user"),
       default: true,
       full_name: N_('Require re-authentication to change admin flag'))
     setting('require_reauth_users_set_disabled',
       type: :boolean,
-      description: N_("Require re-authentication before enabling or disabling a user account"),
+      description: N_("Operation users.set_disabled — require re-authentication before enabling or disabling a user account"),
       default: true,
       full_name: N_('Require re-authentication to enable/disable users'))
     setting('require_reauth_users_impersonate',
       type: :boolean,
-      description: N_("Require re-authentication before impersonating another user"),
+      description: N_("Operation users.impersonate — require re-authentication before impersonating another user"),
       default: true,
       full_name: N_('Require re-authentication to impersonate'))
     setting('require_reauth_auth_sources_update',
       type: :boolean,
-      description: N_("Require re-authentication before updating an authentication source (e.g. LDAP)"),
+      description: N_("Operation auth_sources.update — require re-authentication before updating an authentication source (e.g. LDAP)"),
       default: true,
       full_name: N_('Require re-authentication to update auth sources'))
     setting('require_reauth_users_destroy',
       type: :boolean,
-      description: N_("Require re-authentication before deleting a user"),
+      description: N_("Operation users.destroy — require re-authentication before deleting a user"),
       default: true,
       full_name: N_('Require re-authentication to delete users'))
     setting('require_reauth_users_change_password',
       type: :boolean,
-      description: N_("Require re-authentication before changing another user's password"),
+      description: N_("Operation users.change_password — require re-authentication before changing another user's password"),
       default: true,
       full_name: N_('Require re-authentication to change other users passwords'))
     setting('require_reauth_users_change_roles',
       type: :boolean,
-      description: N_("Require re-authentication before changing user role membership or role/filter definitions"),
+      description: N_("Operation users.change_roles — require re-authentication before changing user role membership or role/filter definitions"),
       default: true,
       full_name: N_('Require re-authentication to change roles'))
     setting('require_reauth_auth_sources_create',
       type: :boolean,
-      description: N_("Require re-authentication before creating an authentication source"),
+      description: N_("Operation auth_sources.create — require re-authentication before creating an authentication source"),
       default: true,
       full_name: N_('Require re-authentication to create auth sources'))
     setting('require_reauth_auth_sources_destroy',
       type: :boolean,
-      description: N_("Require re-authentication before deleting an authentication source"),
+      description: N_("Operation auth_sources.destroy — require re-authentication before deleting an authentication source"),
       default: true,
       full_name: N_('Require re-authentication to delete auth sources'))
     setting('require_reauth_users_terminate_sessions',
       type: :boolean,
-      description: N_("Require re-authentication before terminating user sessions"),
+      description: N_("Operation users.terminate_sessions — require re-authentication before terminating user sessions"),
       default: true,
       full_name: N_('Require re-authentication to terminate sessions'))
     setting('require_reauth_users_invalidate_jwt',
       type: :boolean,
-      description: N_("Require re-authentication before invalidating user registration JWTs"),
+      description: N_("Operation users.invalidate_jwt — require re-authentication before invalidating user registration JWTs"),
       default: true,
       full_name: N_('Require re-authentication to invalidate JWTs'))
     setting('require_reauth_users_create',
       type: :boolean,
-      description: N_("Require re-authentication before creating a user"),
+      description: N_("Operation users.create — require re-authentication before creating a user"),
       default: true,
       full_name: N_('Require re-authentication to create users'))
     setting('require_reauth_personal_access_tokens_create',
       type: :boolean,
-      description: N_("Require re-authentication before creating a personal access token"),
+      description: N_("Operation personal_access_tokens.create — require re-authentication before creating a personal access token"),
       default: true,
       full_name: N_('Require re-authentication to create personal access tokens'))
     setting('require_reauth_personal_access_tokens_revoke',
       type: :boolean,
-      description: N_("Require re-authentication before revoking a personal access token"),
+      description: N_("Operation personal_access_tokens.revoke — require re-authentication before revoking a personal access token"),
       default: true,
       full_name: N_('Require re-authentication to revoke personal access tokens'))
     setting('require_reauth_ssh_keys_create',
       type: :boolean,
-      description: N_("Require re-authentication before adding an SSH public key to a user"),
+      description: N_("Operation ssh_keys.create — require re-authentication before adding an SSH public key to a user"),
       default: true,
       full_name: N_('Require re-authentication to create SSH keys'))
     setting('require_reauth_ssh_keys_destroy',
       type: :boolean,
-      description: N_("Require re-authentication before deleting a user SSH public key"),
+      description: N_("Operation ssh_keys.destroy — require re-authentication before deleting a user SSH public key"),
       default: true,
       full_name: N_('Require re-authentication to delete SSH keys'))
     setting('require_reauth_registration_commands_create',
       type: :boolean,
-      description: N_("Require re-authentication before generating a host registration command (issues a registration JWT)"),
+      description: N_("Operation registration_commands.create — require re-authentication before generating a host registration command (issues a registration JWT)"),
       default: true,
       full_name: N_('Require re-authentication to generate registration commands'))
     setting('require_reauth_key_pairs_download',
       type: :boolean,
-      description: N_("Require re-authentication before downloading a compute resource SSH private key (PEM)"),
+      description: N_("Operation key_pairs.download — require re-authentication before downloading a compute resource SSH private key (PEM)"),
       default: true,
       full_name: N_('Require re-authentication to download compute SSH private keys'))
     setting('require_reauth_key_pairs_recreate',
       type: :boolean,
-      description: N_("Require re-authentication before recreating a compute resource SSH key pair"),
+      description: N_("Operation key_pairs.recreate — require re-authentication before recreating a compute resource SSH key pair"),
       default: true,
       full_name: N_('Require re-authentication to recreate compute SSH key pairs'))
     setting('require_reauth_key_pairs_destroy',
       type: :boolean,
-      description: N_("Require re-authentication before deleting a compute resource SSH key"),
+      description: N_("Operation key_pairs.destroy — require re-authentication before deleting a compute resource SSH key"),
       default: true,
       full_name: N_('Require re-authentication to delete compute SSH keys'))
     setting('require_reauth_hosts_console',
       type: :boolean,
-      description: N_("Require re-authentication before opening a host console (VNC/SPICE may embed a short-lived display password in the page)"),
+      description: N_("Operation hosts.console — require re-authentication before opening a host console (VNC/SPICE may embed a short-lived display password in the page)"),
       default: true,
       full_name: N_('Require re-authentication to open host consoles'))
     setting('require_reauth_compute_resources_vms_console',
       type: :boolean,
-      description: N_("Require re-authentication before opening a compute resource VM console"),
+      description: N_("Operation compute_resources_vms.console — require re-authentication before opening a compute resource VM console"),
       default: true,
       full_name: N_('Require re-authentication to open compute resource VM consoles'))
   end

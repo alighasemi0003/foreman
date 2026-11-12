@@ -67,6 +67,9 @@ class SettingPresenter
   end
 
   def readonly?
+    # F-011: mandatory reauth protections are visible but locked in the Settings UI.
+    return true if defined?(Foreman::Reauthentication) && Foreman::Reauthentication.mandatory_setting?(name)
+
     SETTINGS.key?(name.to_sym)
   end
 

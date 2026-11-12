@@ -141,4 +141,52 @@ class Foreman::ReauthenticationTest < ActiveSupport::TestCase
     Setting[:require_reauth_users_destroy] = false
     refute Foreman::Reauthentication.policy_enabled?('users.destroy')
   end
+
+  test 'operations registry covers action settings and mandatory keys' do
+    assert_operator Foreman::Reauthentication::OPERATIONS.size, :>=, 20
+    Foreman::Reauthentication::ACTION_SETTINGS.each_key do |key|
+      assert Foreman::Reauthentication.registered_operation?(key), key
+      refute Foreman::Reauthentication.mandatory_operation?(key), key
+    end
+    Foreman::Reauthentication::ALWAYS_ON_ACTION_KEYS.each do |key|
+      assert Foreman::Reauthentication.mandatory_operation?(key), key
+      assert Foreman::Reauthentication.policy_enabled?(key), key
+      assert_equal :mandatory_enabled, Foreman::Reauthentication.effective_policy(key)
+    end
+  end
+
+  test 'unknown operation is not registered and stays fail-closed enabled' do
+    refute Foreman::Reauthentication.registered_operation?('evil.controller#destroy')
+    refute Foreman::Reauthentication.registered_operation?('../../etc/passwd')
+    assert Foreman::Reauthentication.policy_enabled?('evil.controller#destroy')
+    assert_equal :unknown, Foreman::Reauthentication.effective_policy('evil.controller#destroy')
+  end
+
+  test 'mandatory setting names are locked' do
+    Foreman::Reauthentication::MANDATORY_SETTING_NAMES.each do |name|
+      assert Foreman::Reauthentication.mandatory_setting?(name), name
+      assert Foreman::Reauthentication.meta_setting?(name), name
+    end
+  end
+
+  test 'policy inventory lists enabled configurable and mandatory rows' do
+    inventory = Foreman::Reauthentication.policy_inventory
+    assert inventory.any? { |row| row[:mandatory] && row[:effective] == :mandatory_enabled }
+    impersonate = inventory.find { |row| row[:key] == 'users.impersonate' }
+    assert impersonate
+    refute impersonate[:mandatory]
+    assert_equal true, impersonate[:enabled]
+  end
+
+  test 'disabling configurable operation changes only reauth policy' do
+    assert Foreman::Reauthentication.policy_enabled?('users.impersonate')
+    Setting[:require_reauth_users_impersonate] = false
+    refute Foreman::Reauthentication.policy_enabled?('users.impersonate')
+    assert_equal :disabled, Foreman::Reauthentication.effective_policy('users.impersonate')
+    # Mandatory and unrelated policies unchanged
+    assert Foreman::Reauthentication.policy_enabled?(Foreman::Reauthentication::META_ACTION_KEY)
+    assert Foreman::Reauthentication.policy_enabled?('users.destroy')
+  ensure
+    Setting[:require_reauth_users_impersonate] = true
+  end
 end
