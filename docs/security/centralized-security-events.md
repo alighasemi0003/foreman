@@ -10,6 +10,7 @@ Audit requirement **80** (چک‌لیست امنیتی، صفحات ۵۶–۵۷)
 | Syslog/ELK example commented in `settings.yaml.example` | Optional JSON/syslog still supported natively; lab uses dedicated TCP collector |
 | No demonstrated central forwarding | Lab collector receives real JSON events (see verification) |
 | Storage not independent of app runtime | Collector has its own Docker volume `security-events` |
+| Tamper resistance (F-042) | Collector UID 1500, append-only + hash chain — see `tamper-resistant-audit-storage.md` |
 
 F-043 / F-044 event categories (if not yet on branch): treated as **pending**, not invented.
 

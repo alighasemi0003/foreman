@@ -1,30 +1,46 @@
-# F-041 — optional centralized security-event collector for lab verification.
+# F-041 / F-042 — centralized security-event collector with tamper-resistant store.
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d security-collector
 #   docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d app
 #
-# Collector is a separate container (independent storage volume). App forwards
-# structured JSON lines over TCP (best-effort, non-blocking).
+# Trust boundary:
+#   - security-collector runs as UID 1500 (auditcollector), separate from Foreman UID 1001
+#   - volume security-events is NOT mounted into app/worker/orchestrator
+#   - TCP accepts append-only new events; HTTP (localhost) is read/verify only
+#   - historical sealed files are mode 0440; active file is O_APPEND by collector only
 services:
   security-collector:
     image: python:3.12-slim
-    command: ["python", "-u", "/collector/receiver.py"]
+    entrypoint: ["/bin/sh", "/collector/entrypoint.sh"]
     environment:
       - SECURITY_COLLECTOR_HOST=0.0.0.0
       - SECURITY_COLLECTOR_PORT=1514
+      - SECURITY_COLLECTOR_HTTP_HOST=127.0.0.1
+      - SECURITY_COLLECTOR_HTTP_PORT=8080
       - SECURITY_COLLECTOR_DATA=/data
+      - SECURITY_COLLECTOR_UID=1500
+      - SECURITY_COLLECTOR_GID=1500
+      - SECURITY_COLLECTOR_ROTATE_BYTES=${SECURITY_COLLECTOR_ROTATE_BYTES:-10485760}
+      - SECURITY_COLLECTOR_RETENTION_DAYS=${SECURITY_COLLECTOR_RETENTION_DAYS:-90}
+      # Optional integrity HMAC — set via secret/env in production; never commit real values.
+      # - SECURITY_COLLECTOR_HMAC_KEY=
     volumes:
       - ./extras/security-collector:/collector:ro
       - security-events:/data
     ports:
       - "${MY_DOCKER_IP:-127.0.0.1}:${FOREMAN_SECURITY_COLLECTOR_PORT:-1514}:1514"
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket;s=socket.create_connection(('127.0.0.1',1514),2);s.close()\""]
       interval: 10s
       timeout: 3s
       retries: 6
-      start_period: 5s
+      start_period: 8s
+    # No credentials are issued that allow DELETE/UPDATE of accepted records.
+    # App services must never gain a bind-mount to security-events.
 
   app:
     environment:
@@ -34,8 +50,8 @@ services:
     depends_on:
       security-collector:
         condition: service_started
+    # Explicitly no security-events volume mount (tamper boundary).
 
-  # Workers may also emit SecurityEvents from background jobs.
   worker:
     environment:
       - FOREMAN_SECURITY_EVENTS_ENABLED=${FOREMAN_SECURITY_EVENTS_ENABLED:-true}

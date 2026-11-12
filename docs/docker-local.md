@@ -65,13 +65,14 @@ Optional VNC console host ports (`5910–5930`):
 docker compose -f docker-compose.yml -f docker-compose.vnc.yml up -d app
 ```
 
-Optional centralized security-event collector (F-041):
+Optional centralized security-event collector (F-041 / F-042):
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.logging.yml up -d security-collector app
 ```
 
-See `docs/security/centralized-security-events.md`.
+See `docs/security/centralized-security-events.md` and
+`docs/security/tamper-resistant-audit-storage.md`.
 
 ## 5. Create first admin (seed)
 
