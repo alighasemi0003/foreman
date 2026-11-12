@@ -22,6 +22,7 @@ class ApplicationController < ActionController::Base
   before_action :require_login, :check_user_enabled
   before_action :check_active_session
   before_action :enforce_password_change_required
+  before_action :consume_failed_login_notice
   before_action :set_gettext_locale_db, :set_gettext_locale
   before_action :session_expiry, :update_activity_time, :unless => proc { |c| c.remote_user_provided? || c.api_request? }
   before_action :set_taxonomy, :require_mail, :check_empty_taxonomy
@@ -82,6 +83,29 @@ class ApplicationController < ActionController::Base
   # from db. It must be called after require_login.
   def set_gettext_locale_db
     params[:locale] ||= User.current.try(:locale)
+  end
+
+  # F-002: one-shot notice of prior failed password attempts for the account owner only.
+  # Uses flash[:info] so it does not overwrite password-change warnings.
+  def consume_failed_login_notice
+    return if api_request?
+    return unless User.current
+
+    count = session.delete(:failed_login_notice_count).to_i
+    owner_id = session.delete(:failed_login_notice_user_id)
+    return if count <= 0
+    # Never show another user's snapshot (session fixation / impersonation edge cases).
+    return unless owner_id.blank? || owner_id.to_i == User.current.id
+
+    # flash.now: show on this response only; a browser refresh must not repeat it.
+    info(
+      n_(
+        'There was %{count} failed login attempt since your last successful login.',
+        'There were %{count} failed login attempts since your last successful login.',
+        count
+      ) % { :count => count },
+      :now => true
+    )
   end
 
   def require_mail

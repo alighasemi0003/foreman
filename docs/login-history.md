@@ -30,6 +30,7 @@ A history row is created when a user successfully establishes a UI session:
 | `request_host` | Application host the client contacted (`request.host`) |
 | `auth_method` | `password`, `ldap`, `external`, or `sso` |
 | `auth_source_name` | Auth source name when available |
+| `failed_attempts_before_login` | Prior local password failures in the lockout window (F-002) |
 
 No passwords, hashes, cookies, session ids, JWTs, PATs, or headers are stored.
 

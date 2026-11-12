@@ -5,6 +5,10 @@
 module UserAccountLockout
   extend ActiveSupport::Concern
 
+  # Snapshot of failed_login_attempts captured immediately before a successful
+  # login resets lockout state (F-002). Used for post-login notification / history.
+  attr_accessor :failed_attempts_before_login
+
   def account_locked?
     locked_until.present? && locked_until > Time.current.utc
   end

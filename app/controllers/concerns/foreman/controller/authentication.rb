@@ -123,13 +123,19 @@ module Foreman::Controller::Authentication
     # users#login / users#extlogin record via login_user to avoid duplicates.
     return if is_a?(UsersController) && %w[login extlogin].include?(action_name)
 
-    UserLoginEvent.record_successful_login!(
+    event = UserLoginEvent.record_successful_login!(
       user: user,
       remote_ip: request.remote_ip,
       request_host: request.host,
       auth_method: 'sso',
-      auth_source_name: user.auth_source&.name
+      auth_source_name: user.auth_source&.name,
+      failed_attempts_before_login: user.failed_attempts_before_login
     )
+    count = event.failed_attempts_before_login.to_i
+    if count.positive?
+      session[:failed_login_notice_count] = count
+      session[:failed_login_notice_user_id] = user.id
+    end
   rescue StandardError => e
     # Match Audit posture for interactive login: surface failure, do not hide it.
     Foreman::Logging.exception('Failed to record SSO login history', e)

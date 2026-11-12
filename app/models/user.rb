@@ -338,6 +338,9 @@ class User < ApplicationRecord
 
   def post_successful_login(reset_account_lockout: true)
     logger.debug "Post-login processing for #{login}"
+    # Capture before reset so interactive login can notify the account owner (F-002).
+    # Count is unsuccessful local password attempts in the current lockout window.
+    self.failed_attempts_before_login = has_attribute?(:failed_login_attempts) ? failed_login_attempts.to_i : 0
     User.as_anonymous_admin do
       update_columns(:last_login_on => Time.now.utc)
       ensure_default_role

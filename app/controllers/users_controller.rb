@@ -519,7 +519,8 @@ class UsersController < ApplicationController
   def login_user(user, auth_method: nil)
     logger.info("User '#{user.login}' logged in from '#{request.remote_ip}'")
     log_authentication_event('login', user, "User '#{user.login}' logged in")
-    record_login_history!(user, auth_method: auth_method)
+    event = record_login_history!(user, auth_method: auth_method)
+    queue_failed_login_notice!(user, event)
     session[:user]         = user.id
     user.claim_active_session
     if Foreman::Reauthentication.marks_login_as_fresh?(user)
@@ -566,7 +567,8 @@ class UsersController < ApplicationController
       remote_ip: request.remote_ip,
       request_host: request.host,
       auth_method: method,
-      auth_source_name: user.auth_source&.name
+      auth_source_name: user.auth_source&.name,
+      failed_attempts_before_login: user.failed_attempts_before_login
     )
   end
 
@@ -575,6 +577,18 @@ class UsersController < ApplicationController
     return 'ldap' if user.auth_source.is_a?(AuthSourceLdap)
 
     'password'
+  end
+
+  # One-shot post-login notice (F-002). Session value is consumed on the next
+  # authenticated HTML request; never shown to unauthenticated clients.
+  def queue_failed_login_notice!(user, event = nil)
+    count = event&.failed_attempts_before_login
+    count = user.failed_attempts_before_login if count.nil?
+    count = count.to_i
+    return if count <= 0
+
+    session[:failed_login_notice_count] = count
+    session[:failed_login_notice_user_id] = user.id
   end
 
   def parameter_filter_context
