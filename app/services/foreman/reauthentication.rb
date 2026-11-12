@@ -33,6 +33,9 @@ module Foreman
       'key_pairs.download' => 'require_reauth_key_pairs_download',
       'key_pairs.recreate' => 'require_reauth_key_pairs_recreate',
       'key_pairs.destroy' => 'require_reauth_key_pairs_destroy',
+      # Console opens may embed short-lived VNC/SPICE display credentials in HTML.
+      'hosts.console' => 'require_reauth_hosts_console',
+      'compute_resources_vms.console' => 'require_reauth_compute_resources_vms_console',
     }.freeze
 
     # Settings that always require reauth (no toggle) — OAuth API credentials.

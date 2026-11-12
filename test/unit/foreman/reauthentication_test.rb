@@ -96,6 +96,8 @@ class Foreman::ReauthenticationTest < ActiveSupport::TestCase
     assert Foreman::Reauthentication.meta_setting?('require_reauth_ssh_keys_destroy')
     assert Foreman::Reauthentication.meta_setting?('require_reauth_registration_commands_create')
     assert Foreman::Reauthentication.meta_setting?('require_reauth_key_pairs_download')
+    assert Foreman::Reauthentication.meta_setting?('require_reauth_hosts_console')
+    assert Foreman::Reauthentication.meta_setting?('require_reauth_compute_resources_vms_console')
     refute Foreman::Reauthentication.meta_setting?('idle_timeout')
     refute Foreman::Reauthentication.meta_setting?('oauth_consumer_key')
   end

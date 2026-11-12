@@ -355,6 +355,7 @@ class HostsController < ApplicationController
   end
 
   def console
+    return unless ensure_reauthenticated!('hosts.console')
     return unless @host.compute_resource
     @console = @host.compute_resource.console @host.uuid
     super

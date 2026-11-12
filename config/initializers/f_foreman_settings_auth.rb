@@ -290,5 +290,15 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Require re-authentication before deleting a compute resource SSH key"),
       default: true,
       full_name: N_('Require re-authentication to delete compute SSH keys'))
+    setting('require_reauth_hosts_console',
+      type: :boolean,
+      description: N_("Require re-authentication before opening a host console (VNC/SPICE may embed a short-lived display password in the page)"),
+      default: true,
+      full_name: N_('Require re-authentication to open host consoles'))
+    setting('require_reauth_compute_resources_vms_console',
+      type: :boolean,
+      description: N_("Require re-authentication before opening a compute resource VM console"),
+      default: true,
+      full_name: N_('Require re-authentication to open compute resource VM consoles'))
   end
 end

@@ -84,6 +84,7 @@ class ComputeResourcesVmsController < ApplicationController
   end
 
   def console
+    return unless ensure_reauthenticated!('compute_resources_vms.console')
     @console = @compute_resource.console @vm.identity
     super
   rescue => e

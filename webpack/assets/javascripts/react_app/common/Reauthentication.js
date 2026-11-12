@@ -60,6 +60,8 @@ const ACTION_LABELS = {
   'key_pairs.download': () => __('Download key pair'),
   'key_pairs.recreate': () => __('Recreate key pair'),
   'key_pairs.destroy': () => __('Delete key pair'),
+  'hosts.console': () => __('Open host console'),
+  'compute_resources_vms.console': () => __('Open compute resource VM console'),
   'settings.reauthentication.update': () => __('Change re-authentication settings'),
   'settings.oauth_credentials.update': () => __('Change OAuth credentials'),
 };

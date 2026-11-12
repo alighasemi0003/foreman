@@ -79,7 +79,8 @@ class WsProxy
   end
 
   def execute(cmd)
-    logger.debug "Starting VNC Proxy: #{cmd}"
+    # Never log display passwords; cmd must not include them (password is RFB-only).
+    logger.debug "Starting VNC Proxy: #{cmd.inspect}"
     Open3.popen3(*cmd) do |stdin, stdout, stderr|
       stdout.each do |line|
         logger.debug "[#{line}"
