@@ -592,6 +592,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | Sessions | Encrypted AR | F-015 on | On when key_base present | Persist key_base | Session row prefix `ARSESS1:` | CODE | App |
 | Tmp/cache lifecycle | Bounded cleanup | Redis + orphan/FileStore policy (F-020) | Redis active; FileStore empty | Prefer Redis; cron `tmp:cache_lifecycle` | `docs/temp-cache-lifecycle.md` | CODE | App |
 | Runtime PID/state/sockets | Liveness-checked cleanup | Entrypoint + Puma harden (F-021) | Compose (no Systemd) | Safe prestart; no blind rm | `docs/runtime-state-lifecycle.md` | CODE | App |
+| FIPS / approved crypto | Validated module + policy | Assessment only (F-024) | OpenSSL 3; FIPS provider installed, **inactive**; `fips_mode=false` | Do not claim FIPS without module+policy | `docs/fips-cryptography-assessment.md` | ASSESS | App + Platform |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |
@@ -674,6 +675,7 @@ App owner → security reviewer → platform/DBA; include request IDs from Secur
 | `docs/connection-capacity.md` | Puma / pool / PG budget |
 | `docs/encryption-key.md` | ENCRYPTION_KEY |
 | `docs/session-encryption.md` | F-015 |
+| `docs/fips-cryptography-assessment.md` | F-024 |
 | `docs/http-rate-limiting.md` | F-026 |
 | `docs/http-request-body-limits.md` | F-028 |
 | `docs/browser-session-policy.md` | Concurrent sessions |
