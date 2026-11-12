@@ -250,6 +250,10 @@ module Foreman
     # Reject TRACE/TRACK/CONNECT/WebDAV and other non-application HTTP methods early.
     config.middleware.insert_before 0, Foreman::Middleware::RejectUnsafeHttpMethods
 
+    # F-026: HTTP/API rate limits (Rails.cache / Redis). After RemoteIp so client IP
+    # follows trusted_proxies — never raw X-Forwarded-For alone.
+    config.middleware.insert_after ActionDispatch::RemoteIp, Foreman::Middleware::HttpRateLimit
+
     config.middleware.insert_before Rails::Rack::Logger, Foreman::Middleware::LoggingContextRequest
     config.middleware.insert_after ActionDispatch::Session::ActiveRecordStore, Foreman::Middleware::LoggingContextSession
 

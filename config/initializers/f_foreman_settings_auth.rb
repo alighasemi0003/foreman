@@ -27,6 +27,54 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Foreman will block user logins from an IP address after this number of failed login attempts for 5 minutes. Set to 0 to disable bruteforce protection"),
       default: 30,
       full_name: N_('Failed login attempts limit'))
+    setting('http_rate_limit_enabled',
+      type: :boolean,
+      description: N_("Enable HTTP/API rate limiting (shared via Rails.cache). Independent of account lockout and failed-login IP bruteforce protection."),
+      default: true,
+      full_name: N_('HTTP rate limiting'))
+    setting('http_rate_limit_period',
+      type: :integer,
+      description: N_("Rate-limit window in seconds (10–3600). Counters reset each window."),
+      default: 60,
+      full_name: N_('HTTP rate limit period (seconds)'))
+    validates('http_rate_limit_period',
+      ->(value) { value.to_i.between?(10, 3600) },
+      message: N_("must be between 10 and 3600"))
+    setting('http_rate_limit_login',
+      type: :integer,
+      description: N_("Max authentication POST requests (login/extlogin/reauthenticate) per client IP per period. Keyed by IP only — not by username."),
+      default: 20,
+      full_name: N_('HTTP rate limit — login'))
+    setting('http_rate_limit_captcha',
+      type: :integer,
+      description: N_("Max CAPTCHA challenge requests per client IP per period."),
+      default: 30,
+      full_name: N_('HTTP rate limit — CAPTCHA'))
+    setting('http_rate_limit_api',
+      type: :integer,
+      description: N_("Max /api requests (except GraphQL and ping) per client IP per period. Sized for legitimate automation and Smart Proxy traffic."),
+      default: 300,
+      full_name: N_('HTTP rate limit — API'))
+    setting('http_rate_limit_graphql',
+      type: :integer,
+      description: N_("Max GraphQL requests per client IP per period."),
+      default: 60,
+      full_name: N_('HTTP rate limit — GraphQL'))
+    setting('http_rate_limit_unattended',
+      type: :integer,
+      description: N_("Max unattended/userdata provisioning requests per client IP per period."),
+      default: 180,
+      full_name: N_('HTTP rate limit — unattended'))
+    setting('http_rate_limit_general',
+      type: :integer,
+      description: N_("Max other (non-API, non-login) HTTP requests per client IP per period. Static assets and health checks are exempt."),
+      default: 600,
+      full_name: N_('HTTP rate limit — general'))
+    setting('http_rate_limit_fail_closed',
+      type: :boolean,
+      description: N_("When rate-limit storage (Rails.cache) is unavailable: if true, reject requests with HTTP 429; if false (default), fail open and log HTTP_RATE_LIMIT_FAIL_OPEN so automation remains available."),
+      default: false,
+      full_name: N_('HTTP rate limit fail closed'))
     setting('captcha_enabled',
       type: :boolean,
       description: N_("Require an offline CAPTCHA challenge for interactive password logins. The challenge is generated and verified entirely on the Foreman server (no external network)."),
