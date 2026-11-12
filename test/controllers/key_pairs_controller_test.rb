@@ -1,8 +1,15 @@
 require 'test_helper'
+require 'openssl'
 
 class KeyPairsControllerTest < ActionController::TestCase
   setup do
+    # Synthetic at-rest key so Encryptable can persist KeyPair#secret in tests.
+    KeyPair.any_instance.stubs(:encryption_key).returns('25d224dd383e92a7e0c82b8bf7c985e8')
     @compute_resource = FactoryBot.create(:ec2_cr)
+  end
+
+  def real_rsa_pem
+    OpenSSL::PKey::RSA.new(1024).to_pem
   end
 
   test "cr with key_pair should get index" do
@@ -22,6 +29,8 @@ class KeyPairsControllerTest < ActionController::TestCase
     assert_response :success
     assert_equal(key.secret, @response.body)
     refute @response.body.size.zero?
+    assert_match(/no-store/, @response.headers['Cache-Control'].to_s)
+    assert_equal 'no-cache', @response.headers['Pragma']
   end
 
   test "should not download key pair when id belongs to a different compute resource" do
@@ -43,6 +52,58 @@ class KeyPairsControllerTest < ActionController::TestCase
     setup_user "view", "keypairs", nil, :one
     get :show, params: { :compute_resource_id => cr_owned.to_param, :id => other_key.id }, session: set_session_user(:one)
     assert_response :not_found
+  end
+
+  test "user without view_compute_resources cannot download key" do
+    key = FactoryBot.create(:key_pair, :compute_resource => @compute_resource)
+    setup_user "view", "keypairs"
+    # Explicitly no compute_resources view permission
+    get :show, params: { :compute_resource_id => @compute_resource.to_param, :id => key.id },
+               session: set_session_user(:one)
+    assert_response :not_found
+    refute_equal key.secret, @response.body
+    refute_includes @response.body.to_s, key.secret
+  end
+
+  test "passphrase on GET download is rejected and secret not returned" do
+    key = FactoryBot.create(:key_pair, :compute_resource => @compute_resource, secret: real_rsa_pem)
+    get :show, params: {
+      :compute_resource_id => @compute_resource.to_param,
+      :id => key.id,
+      :passphrase => 'should-not-be-on-query',
+    }, session: set_session_user
+    assert_response :bad_request
+    refute_includes @response.body.to_s, 'BEGIN'
+    refute_includes @response.body.to_s, key.secret
+  end
+
+  test "encrypted export requires passphrase" do
+    key = FactoryBot.create(:key_pair, :compute_resource => @compute_resource, secret: real_rsa_pem)
+    post :export, params: { :compute_resource_id => @compute_resource.to_param, :id => key.id },
+                  session: set_session_user
+    assert_response :unprocessable_entity
+    refute_includes @response.body.to_s, 'BEGIN'
+  end
+
+  test "encrypted export returns ENCRYPTED pem usable with passphrase only" do
+    pem = real_rsa_pem
+    key = FactoryBot.create(:key_pair, :compute_resource => @compute_resource, secret: pem)
+    passphrase = "synth-export-pass-#{Foreman.uuid}"
+    post :export, params: {
+      :compute_resource_id => @compute_resource.to_param,
+      :id => key.id,
+      :passphrase => passphrase,
+    }, session: set_session_user
+    assert_response :success
+    body = @response.body.to_s
+    assert_includes body, 'ENCRYPTED'
+    refute_equal pem, body
+    assert_match(/no-store/, @response.headers['Cache-Control'].to_s)
+    # Correct passphrase opens; wrong does not. Do not print key material.
+    assert OpenSSL::PKey.read(body, passphrase)
+    assert_raises(OpenSSL::PKey::PKeyError, OpenSSL::PKey::RSAError, ArgumentError) do
+      OpenSSL::PKey.read(body, 'wrong-passphrase')
+    end
   end
 
   test "should recreate a key pair" do

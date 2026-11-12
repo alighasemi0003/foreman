@@ -24,8 +24,14 @@ failures leave the ciphertext unread (legacy read behavior).
 | `HttpProxy` | `password` |
 | `Nic::Base` (BMC) | `password` |
 | `JwtSecret` | `token` |
+| `KeyPair` | `secret` (compute SSH private key) |
 | `ForemanRegister::RegistrationFacet` | `jwt_secret` |
 | Encrypted `Setting` values | `value` |
+
+Compute resource private keys can also be downloaded as passphrase-protected
+PEM via `POST .../key_pairs/:id/export` (passphrase in the POST body only).
+Plain `GET .../key_pairs/:id` remains for SSH/automation compatibility after
+reauthentication.
 
 Built-in rake encrypt helpers cover LDAP + compute resources
 (`rake db:encrypt_all`). Other models need operator-driven re-save or custom

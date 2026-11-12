@@ -26,6 +26,12 @@
                     display_link_if_authorized(_("Download"), hash_for_compute_resource_key_pair_path(@compute_resource, key_pair.key_pair_id), {:data => { :no_turbolink => true, :foreman_reauth => true }}),
                     display_delete_if_authorized(hash_for_compute_resource_key_pairs_path(@compute_resource)
                                                  .merge(:auth_object => @compute_resource, :authorizer => authorizer, :method => 'post', :text => _("Recreate")))) %>
+            <% if authorized_for(hash_for_export_compute_resource_key_pair_path(@compute_resource, key_pair.key_pair_id)) %>
+              <%= form_tag(export_compute_resource_key_pair_path(@compute_resource, key_pair.key_pair_id), method: :post, class: 'form-inline', style: 'margin-top: 0.5em;', data: { foreman_reauth: true, no_turbolink: true }) do %>
+                <%= password_field_tag :passphrase, nil, placeholder: _('Export passphrase'), autocomplete: 'new-password', class: 'form-control input-sm', required: true, aria: { label: _('Passphrase for encrypted PEM export') } %>
+                <%= submit_tag _('Encrypted download'), class: 'btn btn-default btn-sm' %>
+              <% end %>
+            <% end %>
           <% elsif !key_pair.used_elsewhere %>
             <%= action_buttons(display_delete_if_authorized(hash_for_compute_resource_key_pair_path(@compute_resource, key_pair.name)
                                                             .merge(:auth_object => @compute_resource, :authorizer => authorizer, :method => 'delete'))) %>

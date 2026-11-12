@@ -333,7 +333,7 @@ Foreman::AccessControl.map do |permission_set|
   end
 
   permission_set.security_block :key_pairs do |map|
-    map.permission :view_keypairs, {:key_pairs => [:index, :show]}
+    map.permission :view_keypairs, {:key_pairs => [:index, :show, :export]}
     map.permission :destroy_keypairs, {:key_pairs => [:destroy, :create]}
   end
 

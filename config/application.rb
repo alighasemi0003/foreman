@@ -172,7 +172,8 @@ module Foreman
     config.filter_parameters += [
       :password, :account_password, :facts, :root_pass, :value, :report, :password_confirmation, :secret, :ssh_key,
       :token, :api_key, :authenticity_token, :authorization, :auth_token, :private_key, :oauth_token, :refresh_token,
-      :client_secret, :access_token, :session, :cookie, :current_password, :captcha_response
+      :client_secret, :access_token, :session, :cookie, :current_password, :captcha_response,
+      :passphrase, :export_passphrase
     ]
 
     # Enable escaping HTML in JSON.

@@ -10,6 +10,7 @@ class KeyPairsControllerReauthenticationTest < ActionController::TestCase
     Setting[:require_reauth_key_pairs_download] = true
     Setting[:require_reauth_key_pairs_recreate] = true
     Setting[:require_reauth_key_pairs_destroy] = true
+    KeyPair.any_instance.stubs(:encryption_key).returns('25d224dd383e92a7e0c82b8bf7c985e8')
 
     # Fog EC2 is often unavailable in CI; Libvirt is available but lacks :key_pair
     # capability — stub capability + association for download tests.

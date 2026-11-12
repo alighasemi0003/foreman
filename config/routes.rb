@@ -442,7 +442,12 @@ Foreman::Application.routes.draw do
         put 'test_connection'
       end
       resources :images, except: [:show]
-      resources :key_pairs, except: [:new, :edit, :update]
+      resources :key_pairs, except: [:new, :edit, :update] do
+        member do
+          # Passphrase-protected PEM export (POST body only; see KeyPairsController#export)
+          post :export
+        end
+      end
     end
 
     resources :realms, except: [:show] do
