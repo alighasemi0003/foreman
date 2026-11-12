@@ -263,6 +263,7 @@ Foreman::Application.routes.draw do
       post 'impersonate'
       patch 'invalidate_jwt'
       patch 'terminate_active_session'
+      get 'login_history'
     end
     resources :ssh_keys, only: [:new, :create, :destroy]
   end

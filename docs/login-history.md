@@ -48,7 +48,24 @@ logged and do not remove the new row.
 `Foreman::SecurityEvent` remains log-oriented (e.g. reauth) and is not the
 durable login-history store.
 
-## Retrieval
+## Retrieval (F-003)
 
-Model API: `user.login_events.recent_first`. UI listing is deferred to F-003.
-Authorization must scope by user / `view_users` when exposing remotely.
+| Surface | Path / location |
+|---------|-----------------|
+| Full history page | `GET /users/:id/login_history` |
+| My Account tab | User edit → **Login history** (preview of 5) |
+| User menu | **Login history** → current user |
+
+Authorization (server-side):
+
+- Self: `User#editing_self?` includes `login_history` (public `my_account` permission).
+- Others: requires `view_users`.
+- Forced password-change users cannot open the page (same gate as the rest of the UI).
+
+Display labels:
+
+- **Request host** = Foreman application host (`request.host`), *not* client reverse-DNS.
+- **Failed attempts before login** = F-002 snapshot on that successful login row.
+- Times rendered with Foreman timezone helpers; UTC ISO stored value shown as secondary text.
+
+Model API remains `user.login_events.recent_first`.

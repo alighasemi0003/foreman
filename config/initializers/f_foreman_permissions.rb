@@ -4,7 +4,7 @@ Foreman::AccessControl.map do |permission_set|
     map.permission :user_logout, { :users => [:logout] }, :public => true
     map.permission :view_current_user, { :"api/v2/users" => [:show_current] }, public: :true
     map.permission :my_account, {
-      :users => [:edit],
+      :users => [:edit, :login_history],
       :notification_recipients => [:index, :update, :destroy, :update_group_as_read, :destroy_group],
       :"api/v2/table_preferences" => [:show, :create, :update, :destroy, :index],
     }, :public => true
@@ -556,7 +556,7 @@ Foreman::AccessControl.map do |permission_set|
 
   permission_set.security_block :users do |map|
     map.permission :view_users,
-      :users => [:index, :show, :auto_complete_search, :test_mail],
+      :users => [:index, :show, :auto_complete_search, :test_mail, :login_history],
       :"api/v2/users" => [:index, :show]
     map.permission :create_users,
       :users => [:new, :create],

@@ -8,6 +8,9 @@ module Menu
           menu.item :my_account,
             :caption => N_('My Account'),
             :url_hash => {:controller => '/users', :action => 'edit', :id => proc { User.current.id }}
+          menu.item :login_history,
+            :caption => N_('Login history'),
+            :url_hash => {:controller => '/users', :action => 'login_history', :id => proc { User.current.id }}
           menu.item :logout,
             :caption => N_('Log Out'),
             :html => {:'data-method' => :post},

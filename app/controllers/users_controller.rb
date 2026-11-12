@@ -46,6 +46,23 @@ class UsersController < ApplicationController
     (MailNotification.authorized_as(@user, :view_mail_notifications).subscriptable - @user.mail_notifications).sort_by(&:name).each do |mail_notification|
       @user.user_mail_notifications.build(:mail_notification_id => mail_notification.id)
     end
+    # Compact recent history for My Account / user edit (F-003); full list on #login_history.
+    if can_preview_login_history_for?(@user)
+      @login_events_preview = @user.login_events.recent_first.limit(5)
+    end
+  end
+
+  # F-003: authenticated user (self) or view_users may list UserLoginEvent rows.
+  # Does not record events; reuses F-001/F-002 data only. Forced password-change
+  # users cannot reach this action (enforce_password_change_required).
+  def login_history
+    editing_self?
+    @user = find_resource(:view_users)
+    per_page = [[UserLoginEvent.retention_limit, 20].min, 1].max
+    @login_events = @user.login_events.recent_first.paginate(
+      :page => params[:page],
+      :per_page => per_page
+    )
   end
 
   def update
@@ -458,6 +475,13 @@ class UsersController < ApplicationController
 
   def find_resource(permission = :view_users)
     editing_self? ? User.find(User.current.id) : User.authorized(permission).except_hidden.find(params[:id])
+  end
+
+  def can_preview_login_history_for?(user)
+    return false unless user&.persisted? && User.current
+    return true if User.current.id == user.id
+
+    User.current.allowed_to?(:view_users)
   end
 
   def clear_reauth_after_password_change_if_needed!

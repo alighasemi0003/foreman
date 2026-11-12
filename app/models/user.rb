@@ -573,7 +573,7 @@ class User < ApplicationRecord
 
   def editing_self?(options = {})
     options[:controller].to_s == 'users' &&
-      /edit|update|invalidate_jwt/.match?(options[:action]) &&
+      /edit|update|invalidate_jwt|login_history/.match?(options[:action]) &&
       options[:id].to_i == id ||
     /\Aapi\/v\d+\/users\Z/.match?(options[:controller]) &&
       /show|update/.match?(options[:action]) &&

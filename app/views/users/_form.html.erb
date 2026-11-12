@@ -21,6 +21,9 @@
     <% if @editing_self %>
       <li><a href='#jwt_tokens' data-toggle='tab'><%= _('Registration Tokens') %></a></li>
     <% end %>
+    <% if @login_events_preview %>
+      <li><a href='#login_history' data-toggle='tab'><%= _('Login history') %></a></li>
+    <% end %>
     <li><a href='#ui_preferences' data-toggle='tab'><%= _('UI Preferences') %></a></li>
     <%= render_tab_header_for(:main_tabs, :subject => @user, :form => f) %>
   </ul>
@@ -110,6 +113,18 @@
 
     <% if @editing_self %>
       <%= render 'jwt_tokens/jwt_tokens_tab', :f => f, :user => @user %>
+    <% end %>
+
+    <% if @login_events_preview %>
+      <div class='tab-pane' id='login_history'>
+        <p class="help-block">
+          <%= _("Recent successful interactive logins. Request host is the Foreman application hostname contacted by the browser, not a client reverse-DNS domain. Failed attempts are prior local password failures before that login.") %>
+        </p>
+        <%= render :partial => 'login_history_table', :locals => { :login_events => @login_events_preview, :show_pagination => false } %>
+        <p>
+          <%= link_to(_('View full login history'), login_history_user_path(@user), :class => 'btn btn-default') %>
+        </p>
+      </div>
     <% end %>
 
     <div class='tab-pane' id='roles'>

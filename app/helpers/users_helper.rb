@@ -72,4 +72,22 @@ module UsersHelper
   def mail_notification_query_builder(mail_notification, f)
     render :partial => "#{mail_notification}_query_builder", :locals => {:f => f, :mailer => mail_notification.name } if mail_notification.queryable?
   end
+
+  # F-003 — human label for UserLoginEvent#auth_method (escaped by callers via <%= %>).
+  def login_history_auth_label(event)
+    case event.auth_method.to_s
+    when 'password' then _('Password (local)')
+    when 'ldap' then _('LDAP')
+    when 'external' then _('External')
+    when 'sso' then _('SSO')
+    when '', nil then _('—')
+    else event.auth_method.to_s
+    end
+  end
+
+  def can_view_user_login_history?(user)
+    return false unless user && User.current
+    return true if User.current.id == user.id
+    authorized_for(:controller => 'users', :action => 'login_history', :id => user.id, :auth_object => user, :permission => 'view_users')
+  end
 end

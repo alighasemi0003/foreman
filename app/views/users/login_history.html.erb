@@ -1,0 +1,17 @@
+<% title(_("Login history — %s") % @user.to_s) %>
+
+<div class="alert alert-info alert-dismissable">
+  <span class="pficon pficon-info"></span>
+  <p>
+    <%= _("Recent successful interactive logins for this account. Times follow your Foreman timezone preference. Request host is the Foreman hostname the browser contacted — not a client reverse-DNS name.") %>
+  </p>
+  <p>
+    <%= _("Failed attempts are unsuccessful local password tries in the lockout window immediately before that login (see the one-time notice after sign-in).") %>
+  </p>
+</div>
+
+<%= render :partial => 'login_history_table', :locals => { :login_events => @login_events, :show_pagination => true } %>
+
+<% content_for(:title_actions) do %>
+  <%= link_to(_('Back to user'), edit_user_path(@user), :class => 'btn btn-default') %>
+<% end %>

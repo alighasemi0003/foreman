@@ -1,0 +1,45 @@
+<%# locals: login_events (relation/array), show_pagination (optional) %>
+<% show_pagination = local_assigns.fetch(:show_pagination, false) %>
+<% if login_events.blank? %>
+  <div class="blank-slate-pf">
+    <div class="blank-slate-pf-icon"><span class="fa fa-history fa-3x"></span></div>
+    <h1><%= _('No login history yet') %></h1>
+    <p><%= _('Successful interactive logins will appear here after you sign in. History starts from when this feature was deployed — older sessions are not invented.') %></p>
+  </div>
+<% else %>
+  <table class="<%= table_css_classes('table-fixed') %>" id="login-history-table">
+    <thead>
+      <tr>
+        <th><%= _('Logged in at') %></th>
+        <th><%= _('Source IP') %></th>
+        <th><%= _('Request host') %><br><small class="text-muted"><%= _('Foreman application host') %></small></th>
+        <th><%= _('Authentication') %></th>
+        <th><%= _('Failed attempts before login') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% login_events.each do |event| %>
+        <tr>
+          <td>
+            <% if event.logged_in_at.present? %>
+              <%= date_time_absolute(event.logged_in_at, :long, true) %>
+              <br><small class="text-muted"><%= _('Stored UTC:') %> <%= event.logged_in_at.utc.iso8601 %></small>
+            <% else %>
+              <%= _('Unknown') %>
+            <% end %>
+          </td>
+          <td><%= event.remote_ip.presence || _('—') %></td>
+          <td><%= event.request_host.presence || _('—') %></td>
+          <td>
+            <%= login_history_auth_label(event) %>
+            <% if event.auth_source_name.present? %>
+              <br><small class="text-muted"><%= event.auth_source_name %></small>
+            <% end %>
+          </td>
+          <td><%= event.failed_attempts_before_login.to_i %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <%= will_paginate(login_events) if show_pagination && login_events.respond_to?(:total_pages) %>
+<% end %>
