@@ -2,8 +2,9 @@
 
 module Foreman
   module Controller
-    # Interactive local users with password_change_required must change password
-    # before using the rest of the UI (and session-backed API/UI-chrome calls).
+    # Interactive local users with password_change_required (admin-forced or
+    # password_max_age expiration) must change password before using the rest of
+    # the UI (and session-backed API/UI-chrome calls).
     # Machine/token API auth (api_authenticated_session) is unaffected.
     #
     # Hooked from ApplicationController and Api::BaseController after authorize.
@@ -32,7 +33,13 @@ module Foreman
           return
         end
 
-        warning(_("You must change your password before continuing.")) if respond_to?(:warning, true)
+        if respond_to?(:warning, true)
+          if user.password_expired? && !user[:password_change_required]
+            warning(_("Your password has expired. You must set a new password before continuing."))
+          else
+            warning(_("You must change your password before continuing."))
+          end
+        end
         redirect_to main_app.edit_user_path(user)
       end
 

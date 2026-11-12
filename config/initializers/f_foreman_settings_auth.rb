@@ -143,6 +143,14 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Maximum number of successful interactive login history records retained per user (1-100). Older entries are removed after each new login."),
       default: 20,
       full_name: N_('Login history limit'))
+    setting('password_max_age',
+      type: :integer,
+      description: N_("Maximum age in days for locally managed (internal) passwords before renewal is required. Set to 0 to disable password expiration. Does not apply to LDAP or external authentication providers."),
+      default: 0,
+      full_name: N_('Password maximum age (days)'))
+    validates('password_max_age',
+      ->(value) { value.to_i.between?(0, 3650) },
+      message: N_("must be between 0 and 3650 (0 disables expiration)"))
     setting('password_hash',
       type: :string,
       description: N_("Password hashing algorithm. A password change is needed effect existing passwords."),

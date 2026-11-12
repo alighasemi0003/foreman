@@ -470,7 +470,10 @@ class UsersController < ApplicationController
   def clear_password_change_required_after_own_password_update!
     return unless editing_self?
     return if user_params[:password].blank?
-    return unless @user.password_change_required?
+
+    # Column may still be true after a successful update; expiration clears via
+    # password_changed_at stamped in UserPasswordExpiration.
+    return unless @user[:password_change_required]
 
     @user.update_column(:password_change_required, false)
     Foreman::SecurityEvent.log(
@@ -537,7 +540,11 @@ class UsersController < ApplicationController
     TopbarSweeper.expire_cache
     telemetry_increment_counter(:successful_ui_logins)
     if user.password_change_required?
-      warning(_("You must change your password before continuing."))
+      if user.password_expired? && !user[:password_change_required]
+        warning(_("Your password has expired. You must set a new password before continuing."))
+      else
+        warning(_("You must change your password before continuing."))
+      end
       redirect_to edit_user_path(user)
       return
     end

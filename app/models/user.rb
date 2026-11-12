@@ -2,7 +2,8 @@ require 'digest/sha1'
 
 class User < ApplicationRecord
   audited :except => [:last_login_on, :password_hash, :password_salt, :password_confirmation,
-                      :failed_login_attempts, :failed_login_started_at, :locked_until, :has_active_session],
+                      :failed_login_attempts, :failed_login_started_at, :locked_until, :has_active_session,
+                      :password_changed_at],
     :associations => [:roles, :usergroups]
   include Authorizable
   include Foreman::TelemetryHelper
@@ -18,6 +19,7 @@ class User < ApplicationRecord
   include JwtAuth
   include UserAccountLockout
   include UserPasswordComplexity
+  include UserPasswordExpiration
   include Foreman::ObservableModel
 
   ANONYMOUS_ADMIN = 'foreman_admin'
