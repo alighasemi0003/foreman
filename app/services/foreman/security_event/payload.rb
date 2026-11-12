@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
+require_relative 'severity'
+
 module Foreman
   module SecurityEvent
     # Builds the centralized security-event JSON schema (F-041).
     # Never include secrets — sanitize and scrub known sensitive tokens.
+    #
+    # F-030 adds severity / severity_syslog / severity_rails — orthogonal to
+    # status (SUCCESS/DENIED/…). Collector stores these for search/filter.
     module Payload
       SOURCE_SERVICE = 'foreman'
       EVENT_TYPE = 'security'
@@ -17,12 +22,19 @@ module Foreman
       module_function
 
       def build(event:, status:, actor: nil, actor_id: nil, target: nil, ip: nil,
-                details: nil, operation: nil, reason_code: nil, request_id: nil)
+                details: nil, operation: nil, reason_code: nil, request_id: nil,
+                severity: nil, level: nil)
+        sev = Severity.resolve(event: event, severity: severity, level: level)
+        sev_meta = Severity.metadata(sev)
+
         {
           'ts' => Time.now.utc.iso8601(3),
           'event_type' => EVENT_TYPE,
           'event_id' => event.to_s,
           'status' => status.to_s,
+          'severity' => sev_meta[:severity],
+          'severity_syslog' => sev_meta[:severity_syslog],
+          'severity_rails' => sev_meta[:severity_rails],
           'actor' => blank_to_nil(Foreman::SecurityEvent.sanitize(actor)),
           'actor_id' => actor_id.presence&.to_i,
           'target' => blank_to_nil(Foreman::SecurityEvent.sanitize(target)),

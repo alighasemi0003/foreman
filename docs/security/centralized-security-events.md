@@ -35,7 +35,10 @@ Foreman SecurityEvent.log
 | `ts` | UTC ISO-8601 |
 | `event_type` | always `security` |
 | `event_id` | e.g. `REAUTH_SUCCESS`, `HTTP_RATE_LIMIT_EXCEEDED` |
-| `status` | SUCCESS / FAILURE / DENIED / … |
+| `status` | SUCCESS / FAILURE / DENIED / … (outcome; orthogonal to severity) |
+| `severity` | F-030: `ALERT` / `CRITICAL` / `ERROR` / `WARNING` / `NOTICE` / `INFORMATIONAL` |
+| `severity_syslog` | Syslog severity 1–6 (see `docs/security-logging-severity.md`) |
+| `severity_rails` | Mapped Rails logger level (`fatal`/`error`/`warn`/`info`) |
 | `actor` | sanitized login |
 | `actor_id` | optional numeric id |
 | `target` | sanitized resource |

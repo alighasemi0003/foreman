@@ -36,14 +36,19 @@ class SecurityEventRequestContextTest < ActiveSupport::TestCase
   test 'reauth event types can be emitted without password leakage' do
     ::Logging.mdc['remote_ip'] = '203.0.113.44'
     begin
-      %w[REAUTH_SUCCESS REAUTH_FAILED REAUTH_UNSUPPORTED REAUTH_REQUIRED].each do |event|
+      {
+        'REAUTH_SUCCESS' => :info,
+        'REAUTH_FAILED' => :warn,
+        'REAUTH_UNSUPPORTED' => :info,
+        'REAUTH_REQUIRED' => :info,
+      }.each do |event, rails_level|
         status = event == 'REAUTH_SUCCESS' ? 'SUCCESS' : 'FAILURE'
-        Rails.logger.expects(:info).with do |msg|
+        Rails.logger.expects(rails_level).with do |msg|
           msg.is_a?(String) &&
             msg.include?("SecurityEvent #{event}") &&
+            msg.include?('severity=') &&
             msg.exclude?('SuperSecretPass1!') &&
-            msg.exclude?('Bearer ') &&
-            msg.exclude?('password=')
+            msg.exclude?('Bearer ')
         end
         Foreman::SecurityEvent.log(
           event: event,

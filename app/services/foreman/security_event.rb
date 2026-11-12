@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'security_event/severity'
 require_relative 'security_event/payload'
 require_relative 'security_event/forwarder'
 
@@ -13,6 +14,9 @@ module Foreman
   #
   # F-041: also builds a structured JSON payload and best-effort forwards it to an
   # external collector when FOREMAN_SECURITY_EVENTS_ENABLED=true.
+  #
+  # F-030: structured severity (ALERT…INFORMATIONAL) is carried on the payload and
+  # mapped onto Rails logger levels — Logger internals are not patched.
   module SecurityEvent
     module_function
 
@@ -31,7 +35,9 @@ module Foreman
 
     # @param event [String] machine-readable event id, e.g. REAUTH_SUCCESS
     # @param status [String] SUCCESS / FAILURE / DENIED / LOCKED / UNLOCKED / UNSUPPORTED
-    # @param level [Symbol] :info or :warn
+    # @param level [Symbol, nil] optional Rails logger level (:info/:warn/:error/:fatal).
+    #   When omitted, derived from severity. Kept for backward compatibility.
+    # @param severity [String, Symbol, nil] F-030 category (ALERT…INFORMATIONAL)
     # @param actor [String, nil] username/login
     # @param actor_id [Integer, nil]
     # @param ip [String, nil]
@@ -39,8 +45,8 @@ module Foreman
     # @param details [String, nil] extra free-text (sanitized)
     # @param operation [String, nil]
     # @param reason_code [String, nil]
-    def log(event:, status:, level: :info, actor: nil, actor_id: nil, ip: nil, target: nil,
-             details: nil, operation: nil, reason_code: nil)
+    def log(event:, status:, level: nil, severity: nil, actor: nil, actor_id: nil, ip: nil,
+             target: nil, details: nil, operation: nil, reason_code: nil)
       actor_s = sanitize(actor)
       ip_s = sanitize(ip.presence || current_ip)
       target_s = sanitize(target)
@@ -48,16 +54,24 @@ module Foreman
       details_s = Payload.scrub_details(details)
       request_id = current_request_id
 
+      sev = Severity.resolve(event: event, severity: severity, level: level)
+      rails_level = level.present? ? level.to_sym : Severity.to_rails_level(sev)
+      # Guard unknown Rails levels — fall back safely.
+      unless Rails.logger.respond_to?(rails_level)
+        rails_level = Severity.to_rails_level(sev)
+      end
+
       fields = {
         security_event: event.to_s,
         security_status: status.to_s,
+        security_severity: sev,
         security_actor: actor_s.presence,
         security_ip: ip_s.presence,
         security_target: target_s.presence,
         security_request_id: request_id,
       }.compact
 
-      message = "SecurityEvent #{event} status=#{status}"
+      message = "SecurityEvent #{event} status=#{status} severity=#{sev}"
       message += " actor=#{actor_s}" if actor_s.present?
       message += " ip=#{ip_s}" if ip_s.present?
       message += " target=#{target_s}" if target_s.present?
@@ -65,12 +79,14 @@ module Foreman
       message += " #{details_s}" if details_s.present?
 
       Foreman::Logging.with_fields(fields) do
-        Rails.logger.public_send(level, message)
+        Rails.logger.public_send(rails_level, message)
       end
 
       payload = Payload.build(
         event: event,
         status: status,
+        severity: sev,
+        level: rails_level,
         actor: actor_s,
         actor_id: actor_id,
         target: target_s,
