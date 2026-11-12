@@ -72,6 +72,8 @@ $(document).on('ContentLoad', () => {
     const host = $('#vnc').attr('data-host') || window.location.hostname;
     const port = $('#vnc').attr('data-port');
     const path = $('#vnc').attr('data-path');
+    // Prefer server-side RFB auth (ticket in path). Only use a password when
+    // the page explicitly embeds one (legacy / non-RFB-gateway consoles).
     const password = $('#vnc').attr('data-password');
     const tokenProtocol = $('#vnc').attr('data-token-protocol');
     const plainProtocol = $('#vnc').attr('data-plain-protocol');

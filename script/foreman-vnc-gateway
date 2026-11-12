@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Standalone VNC WebSocket gateway (RFB auth stays server-side).
+# Usage:
+#   foreman-vnc-gateway --port 5910 --ticket TICKET [--store-dir DIR] ...
+
+root = File.expand_path('..', __dir__)
+$LOAD_PATH.unshift(File.join(root, 'lib'))
+
+begin
+  require 'bundler/setup'
+rescue LoadError
+  vendor = Dir[File.join(root, 'vendor/{bundle,ruby}/**/gems/websocket-driver-*/lib')].first
+  $LOAD_PATH.unshift(vendor) if vendor
+end
+
+require 'foreman/console/vnc_des'
+require 'foreman/console/ticket'
+require 'foreman/console/rfb_auth_proxy'
+require 'foreman/console/ws_gateway'
+
+Process.daemon(true) if ARGV.delete('--daemon')
+
+Foreman::Console::WsGateway.run!(ARGV)
