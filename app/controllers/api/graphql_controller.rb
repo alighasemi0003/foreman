@@ -6,6 +6,7 @@ module Api
     include Foreman::Controller::Authentication
     include Foreman::Controller::ApiCsrfProtection
     include Foreman::Controller::BruteforceProtection
+    include Foreman::Controller::SecurityRejectionEvents
 
     rescue_from Exception, with: :handle_uncaught_exception
 
@@ -39,6 +40,11 @@ module Api
       count_login_failure if available_sso.present? && !authenticated
 
       authenticated
+    end
+
+    def handle_unverified_request
+      emit_csrf_rejected_event!
+      super
     end
 
     private

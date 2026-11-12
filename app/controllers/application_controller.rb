@@ -4,6 +4,7 @@ class ApplicationController < ActionController::Base
   include Foreman::Controller::Flash
   include Foreman::Controller::Authorize
   include Foreman::Controller::PasswordChangeRequired
+  include Foreman::Controller::SecurityRejectionEvents
 
   protect_from_forgery with: :exception # See ActionController::RequestForgeryProtection for details
   # Always register; re-raise when requests are treated as local (dev/test default).
@@ -76,7 +77,14 @@ class ApplicationController < ActionController::Base
   end
 
   def deny_access
+    emit_authorization_denied_event!(reason_code: 'permission_denied', http_status: 403)
     (User.current.logged? || request.xhr?) ? render_403 : require_login
+  end
+
+  # F-044: CSRF failures raise InvalidAuthenticityToken after this hook.
+  def handle_unverified_request
+    emit_csrf_rejected_event!
+    super
   end
 
   # This filter is called before FastGettext set_gettext_locale and sets user-defined locale
@@ -280,6 +288,12 @@ class ApplicationController < ActionController::Base
   end
 
   def render_403(msg = nil)
+    # deny_access already emits; require_admin / direct render_403 still need an event.
+    emit_authorization_denied_event!(
+      reason_code: msg.present? ? 'forbidden' : 'permission_denied',
+      http_status: 403,
+      details: (msg.present? ? 'admin_or_explicit_forbid' : nil)
+    )
     if msg.nil?
       @missing_permissions = Foreman::AccessControl.permissions_for_controller_action(path_to_authenticate)
       Foreman::Logging.logger('permissions').info "rendering 403 because of missing permission #{@missing_permissions.map(&:name).join(', ')}"

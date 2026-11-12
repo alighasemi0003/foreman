@@ -19,6 +19,7 @@ module Foreman
       def call(env)
         method = env['REQUEST_METHOD'].to_s.upcase
         if UNSAFE.include?(method) || !ALLOWED.include?(method)
+          log_security_control_rejection(env, method)
           return [
             405,
             {
@@ -30,6 +31,28 @@ module Foreman
           ]
         end
         @app.call(env)
+      end
+
+      private
+
+      # F-044: structured event for rejected non-REST / WebDAV-style verbs.
+      def log_security_control_rejection(env, method)
+        ip = env['action_dispatch.remote_ip']&.to_s.presence ||
+             env['HTTP_X_FORWARDED_FOR']&.to_s&.split(',')&.first&.strip.presence ||
+             env['REMOTE_ADDR']
+        path = env['PATH_INFO'].to_s
+        Foreman::SecurityEvent.log(
+          event: 'SECURITY_CONTROL_REJECTED',
+          status: 'DENIED',
+          level: :warn,
+          actor: nil,
+          reason_code: 'unsafe_http_method',
+          operation: 'http_method.reject',
+          ip: ip,
+          details: "control=http_method http_status=405 method=#{method} path=#{path}"
+        )
+      rescue StandardError
+        nil
       end
     end
   end

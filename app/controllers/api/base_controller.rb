@@ -5,6 +5,7 @@ module Api
     include Foreman::Controller::ApiCsrfProtection
     include Foreman::Controller::BruteforceProtection
     include Foreman::Controller::PasswordChangeRequired
+    include Foreman::Controller::SecurityRejectionEvents
 
     before_action :load_settings
     before_action :set_default_response_format, :authorize, :set_taxonomy
@@ -229,6 +230,7 @@ module Api
 
     def require_admin
       unless is_admin?
+        emit_authorization_denied_event!(reason_code: 'admin_required', http_status: 401)
         render_error('access_denied', :status => :unauthorized, :locals => { :details => _('Admin permissions required') })
         false
       end
@@ -239,8 +241,14 @@ module Api
     end
 
     def deny_access(details = nil)
+      emit_authorization_denied_event!(reason_code: 'permission_denied', http_status: 403)
       render_error 'access_denied', :status => :forbidden, :locals => { :details => details }
       false
+    end
+
+    def handle_unverified_request
+      emit_csrf_rejected_event!
+      super
     end
 
     def set_default_response_format

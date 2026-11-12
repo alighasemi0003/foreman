@@ -105,7 +105,7 @@ Search by request id / actor / time: filter JSON lines (`jq 'select(.request_id=
 
 ## Event categories (current branch)
 
-Delivered when emitted by application code: REAUTH_*, `ACCOUNT_LOCKOUT` (F-043), HTTP_RATE_LIMIT_*, HTTP_BODY_TOO_LARGE, host info export, JWT/registration invalidation paths, session terminate hooks that already call `SecurityEvent.log`.
+Delivered when emitted by application code: REAUTH_*, `ACCOUNT_LOCKOUT` (F-043), `CSRF_REJECTED` / `AUTHORIZATION_DENIED` / `SECURITY_CONTROL_REJECTED` (F-044), HTTP_RATE_LIMIT_*, HTTP_BODY_TOO_LARGE, host info export, JWT/registration invalidation paths, session terminate hooks that already call `SecurityEvent.log`.
 
 Login success/failure remain primarily in **Audit** / login_events (by design); SecurityEvent does not replace them.
 
