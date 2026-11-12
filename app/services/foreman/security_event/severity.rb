@@ -51,8 +51,8 @@ module Foreman
         'unknown' => 'WARNING',
       }.freeze
 
-      # Conservative defaults — auth failures are WARNING, not CRITICAL (F-030).
-      # Detailed taxonomy remains F-031.
+      # Legacy inline defaults kept as fallback if Taxonomy is unavailable.
+      # F-031 Taxonomy is the source of truth when loaded.
       EVENT_DEFAULTS = {
         'ACCOUNT_LOCKOUT' => 'WARNING',
         'CSRF_REJECTED' => 'WARNING',
@@ -67,6 +67,7 @@ module Foreman
         'REAUTH_UNSUPPORTED' => 'INFORMATIONAL',
         'SESSION_TERMINATE' => 'NOTICE',
         'SESSION_TERMINATE_ALL' => 'NOTICE',
+        'JWT_INVALIDATE' => 'NOTICE',
         'JWT_INVALIDATED' => 'NOTICE',
         'REGISTRATION_TOKEN_INVALIDATED' => 'NOTICE',
         'SENSITIVE_EXPORT' => 'NOTICE',
@@ -121,6 +122,13 @@ module Foreman
       end
 
       def default_for_event(event_id)
+        begin
+          require_relative 'taxonomy' unless defined?(Foreman::SecurityEvent::Taxonomy)
+          sev = Taxonomy.default_severity_for(event_id)
+          return sev if normalize(sev)
+        rescue LoadError, NameError
+          # Fall through to inline defaults
+        end
         EVENT_DEFAULTS[event_id.to_s] || FALLBACK
       end
 

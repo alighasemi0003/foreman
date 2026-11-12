@@ -594,6 +594,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | Runtime PID/state/sockets | Liveness-checked cleanup | Entrypoint + Puma harden (F-021) | Compose (no Systemd) | Safe prestart; no blind rm | `docs/runtime-state-lifecycle.md` | CODE | App |
 | FIPS / approved crypto | Validated module + policy | Assessment only (F-024) | OpenSSL 3; FIPS provider installed, **inactive**; `fips_mode=false` | Do not claim FIPS without module+policy | `docs/fips-cryptography-assessment.md` | ASSESS | App + Platform |
 | Security log severity | Six structured levels | F-030 severity on SecurityEvent | NOTICE/ALERT via payload fields | Search collector by `severity` | `docs/security-logging-severity.md` | CODE | App |
+| Security event taxonomy | Category + classification | F-031 Taxonomy policy | Proposed (not org-approved) | Search `event_category` / `data_classification` | `docs/security-event-taxonomy.md` | CODE | App |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |

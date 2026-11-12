@@ -85,5 +85,6 @@ Map `severity` or `severity_syslog` to SIEM severities downstream.
 
 ## Relation to F-031
 
-F-031 defines classification and event taxonomy. F-030 only ensures the six
-severity categories are representable, delivered, and searchable.
+F-031 defines classification and event taxonomy (`docs/security-event-taxonomy.md`).
+Severity defaults for known events are sourced from `Taxonomy` when loaded.
+F-030 ensures the six severity categories are representable, delivered, and searchable.

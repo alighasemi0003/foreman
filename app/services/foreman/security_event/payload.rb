@@ -1,31 +1,32 @@
 # frozen_string_literal: true
 
 require_relative 'severity'
+require_relative 'taxonomy'
 
 module Foreman
   module SecurityEvent
     # Builds the centralized security-event JSON schema (F-041).
     # Never include secrets — sanitize and scrub known sensitive tokens.
     #
-    # F-030 adds severity / severity_syslog / severity_rails — orthogonal to
-    # status (SUCCESS/DENIED/…). Collector stores these for search/filter.
+    # F-030: severity / severity_syslog / severity_rails
+    # F-031: event_category / data_classification / taxonomy_policy / retention_days
+    # status (SUCCESS/DENIED/…) remains orthogonal to severity and classification.
     module Payload
       SOURCE_SERVICE = 'foreman'
       EVENT_TYPE = 'security'
 
-      SENSITIVE_SUBSTRINGS = %w[
-        password passwd passphrase secret token jwt pat bearer
-        authorization cookie session_id sessionid private_key
-        encryption_key api_key captcha
-      ].freeze
+      SENSITIVE_SUBSTRINGS = Taxonomy::PROHIBITED_ALWAYS
 
       module_function
 
       def build(event:, status:, actor: nil, actor_id: nil, target: nil, ip: nil,
                 details: nil, operation: nil, reason_code: nil, request_id: nil,
-                severity: nil, level: nil)
+                severity: nil, level: nil, classification: nil, category: nil)
+        policy = Taxonomy.lookup(event)
         sev = Severity.resolve(event: event, severity: severity, level: level)
         sev_meta = Severity.metadata(sev)
+        data_class = Taxonomy.resolve_classification(event: event, classification: classification)
+        event_category = Taxonomy.resolve_category(event: event, category: category)
 
         {
           'ts' => Time.now.utc.iso8601(3),
@@ -35,6 +36,10 @@ module Foreman
           'severity' => sev_meta[:severity],
           'severity_syslog' => sev_meta[:severity_syslog],
           'severity_rails' => sev_meta[:severity_rails],
+          'event_category' => event_category,
+          'data_classification' => data_class,
+          'taxonomy_policy' => Taxonomy.policy_id,
+          'retention_days' => policy[:retention_days],
           'actor' => blank_to_nil(Foreman::SecurityEvent.sanitize(actor)),
           'actor_id' => actor_id.presence&.to_i,
           'target' => blank_to_nil(Foreman::SecurityEvent.sanitize(target)),

@@ -39,6 +39,10 @@ Foreman SecurityEvent.log
 | `severity` | F-030: `ALERT` / `CRITICAL` / `ERROR` / `WARNING` / `NOTICE` / `INFORMATIONAL` |
 | `severity_syslog` | Syslog severity 1–6 (see `docs/security-logging-severity.md`) |
 | `severity_rails` | Mapped Rails logger level (`fatal`/`error`/`warn`/`info`) |
+| `event_category` | F-031 taxonomy category (authentication, authorization, …) |
+| `data_classification` | F-031 sensitivity: `public`/`internal`/`confidential`/`restricted` |
+| `taxonomy_policy` | Policy id (proposed technical policy) |
+| `retention_days` | Suggested retention for the event class |
 | `actor` | sanitized login |
 | `actor_id` | optional numeric id |
 | `target` | sanitized resource |
