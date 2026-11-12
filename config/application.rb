@@ -310,7 +310,10 @@ module Foreman
     config.log_level = Foreman::Logging.logger_level('app').to_sym
     config.active_record.logger = Foreman::Logging.logger('sql')
 
-    # enables in memory cache store with ttl
+    # Rails cache: prefer Redis (TTL via expires_in on writers). FileStore fallback
+    # gets a default expires_in so tmp/cache cannot grow unbounded (F-020).
+    # Do not set a global default expires_in on Redis — some keys (task queues,
+    # name generator) intentionally omit TTL.
     rails_cache_settings = SETTINGS[:rails_cache_store]
     if (rails_cache_settings && rails_cache_settings[:type] == 'redis')
       options = [:redis_cache_store]
@@ -325,8 +328,10 @@ module Foreman
       config.cache_store = options
       Foreman::Logging.logger('app').info "Rails cache backend: Redis"
     else
-      config.cache_store = :file_store, Rails.root.join('tmp', 'cache/')
-      Foreman::Logging.logger('app').info "Rails cache backend: File"
+      config.cache_store = :file_store, Rails.root.join('tmp', 'cache/'), {
+        expires_in: 12.hours,
+      }
+      Foreman::Logging.logger('app').info "Rails cache backend: File (default expires_in=12h)"
     end
 
     if config.public_file_server.enabled

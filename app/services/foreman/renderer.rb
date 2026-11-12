@@ -15,17 +15,22 @@ module Foreman
         yield config
       end
 
+      # Returns an open Tempfile under Rails.root/tmp. Caller must close!/unlink
+      # after use (see Orchestration::SshProvision). Avoid Tempfile.open(&block)
+      # here: the block form closes but leaves the path until GC finalizer (F-020).
       def render_template_to_tempfile(template:, prefix:, host: nil, params: {}, variables: {}, options: {})
-        file = ''
         source = get_source(template: template, host: host)
         scope = get_scope(host: host, params: params, variables: variables)
-        Tempfile.open(prefix, Rails.root.join('tmp')) do |f|
-          f.print render(source, scope)
-          f.flush
-          f.chmod options[:mode] if options[:mode]
-          file = f
+        file = Tempfile.new(prefix, Rails.root.join('tmp'))
+        begin
+          file.print render(source, scope)
+          file.flush
+          file.chmod options[:mode] if options[:mode]
+          file
+        rescue StandardError
+          file.close!
+          raise
         end
-        file
       end
 
       def get_source(template:, klass: nil, **args)

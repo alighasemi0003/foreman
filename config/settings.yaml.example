@@ -146,6 +146,12 @@
 # Set the rails cache implementation:
 # file (default) and redis are supported
 #
+# Prefer redis in production. FileStore fallback applies a default expires_in
+# of 12 hours (F-020) so tmp/cache cannot grow without bound. Redis keys rely
+# on per-write expires_in; Foreman does not FLUSH the Redis cache DB.
+# Orphan tmp file cleanup: rake tmp:cache_lifecycle (daily cron) — see
+# docs/temp-cache-lifecycle.md
+#
 # :rails_cache_store:
 #   :type: redis
 #   :urls:

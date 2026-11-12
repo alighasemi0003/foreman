@@ -38,7 +38,8 @@ module Foreman
     # OpenSSL::X509::Store certificate
     def self.add_ca_bundle_to_store(ca_bundle, cert_store)
       ca_bundle = normalize_line_endings(ca_bundle)
-      Tempfile.open('cert.pem', Rails.root.join('tmp')) do |f|
+      # Tempfile.create unlinks after the block (F-020); open(&block) would leave PEM on disk until GC.
+      Tempfile.create(['cert', '.pem'], Rails.root.join('tmp')) do |f|
         f.write(ca_bundle)
         f.flush
         cert_store.add_file(f.path)

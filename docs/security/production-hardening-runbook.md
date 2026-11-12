@@ -590,6 +590,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | Redis | Pinned tag + auth if exposed | Pin + network isolate | Floating `redis` tag, no auth | Pin; do not expose | Compose override | LAB weak | Platform |
 | Encryption | Key present | Required | Operator-dependent | Required + backup | `rake security:check_encryption_key` | DEPLOYMENT | App |
 | Sessions | Encrypted AR | F-015 on | On when key_base present | Persist key_base | Session row prefix `ARSESS1:` | CODE | App |
+| Tmp/cache lifecycle | Bounded cleanup | Redis + orphan/FileStore policy (F-020) | Redis active; FileStore empty | Prefer Redis; cron `tmp:cache_lifecycle` | `docs/temp-cache-lifecycle.md` | CODE | App |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |

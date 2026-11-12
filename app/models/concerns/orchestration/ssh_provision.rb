@@ -38,6 +38,7 @@ module Orchestration::SshProvision
   end
 
   def delSSHProvisionScript
+    cleanup_ssh_provision_tempfile
   end
 
   def setSSHWaitForResponse
@@ -78,9 +79,28 @@ module Orchestration::SshProvision
     end
   rescue => e
     failure _("Failed to launch script on %{name}: %{e}") % { :name => name, :e => e }, e
+  ensure
+    # Finish templates may contain secrets — do not leave them under tmp/ (F-020).
+    cleanup_ssh_provision_tempfile
   end
 
   def delSSHProvision
+    cleanup_ssh_provision_tempfile
+  end
+
+  def cleanup_ssh_provision_tempfile
+    file = template_file
+    return if file.nil?
+
+    self.template_file = nil
+    if file.respond_to?(:close!)
+      file.close!
+    else
+      path = file.respond_to?(:path) ? file.path : file.to_s
+      File.unlink(path) if path.present? && File.exist?(path) && !File.symlink?(path)
+    end
+  rescue StandardError => e
+    Foreman::Logging.logger('app').warn("F020_SSH_TEMPFILE_CLEANUP: #{e.class}: #{e.message}")
   end
 
   def validate_ssh_provisioning
