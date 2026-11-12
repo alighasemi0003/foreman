@@ -1600,6 +1600,54 @@ class HostsControllerTest < ActionController::TestCase
     end
   end
 
+  context 'F-019 host YAML export redaction' do
+    setup do
+      @yaml_secret = 'synth-yaml-secret-f019-abc'
+      @yaml_visible = 'synth-yaml-visible-f019'
+      as_admin do
+        @yaml_host = FactoryBot.create(:host, :location => taxonomies(:location1),
+          :organization => taxonomies(:organization1))
+        @yaml_host.host_parameters.create!(:name => 'synth_secret', :value => @yaml_secret, :hidden_value => true)
+        @yaml_host.host_parameters.create!(:name => 'synth_visible', :value => @yaml_visible, :hidden_value => false)
+      end
+    end
+
+    test 'admin YAML export includes hidden parameters and sets no-store headers' do
+      get :show, params: { :id => @yaml_host.to_param, :format => 'yaml' }, session: set_session_user
+      assert_response :success
+      assert_includes @response.body, @yaml_secret
+      assert_includes @response.body, @yaml_visible
+      assert_match(/no-store/, @response.headers['Cache-Control'])
+    end
+
+    test 'view_hosts YAML export redacts hidden parameters' do
+      setup_user 'view', 'hosts'
+      setup_user 'view', 'params'
+      setup_user 'view', 'locations'
+      setup_user 'view', 'organizations'
+      get :show, params: { :id => @yaml_host.to_param, :format => 'yaml' },
+        session: set_session_user(@one)
+      assert_response :success
+      refute_includes @response.body, @yaml_secret
+      assert_includes @response.body, @yaml_visible
+      assert_includes @response.body, '*****'
+    end
+
+    test 'host CSV inventory does not include host parameter secrets' do
+      User.current.table_preferences.create(name: 'hosts', columns: ['name', 'os_title', 'owner'])
+      get :index, params: { :format => 'csv', :search => "name = #{@yaml_host.name}" }, session: set_session_user
+      assert_response :success
+      body = ''
+      buf = response.stream.instance_variable_get(:@buf)
+      loop do
+        body << buf.next
+      rescue StopIteration
+        break
+      end
+      refute_includes body, @yaml_secret
+    end
+  end
+
   private
 
   def current_hosts_path(*args)

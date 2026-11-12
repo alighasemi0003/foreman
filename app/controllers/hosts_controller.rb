@@ -10,6 +10,7 @@ class HostsController < ApplicationController
   include Foreman::Controller::Puppet::HostsControllerExtensions
   include Foreman::Controller::CsvResponder
   include Foreman::Controller::ConsoleCommon
+  include Foreman::Controller::HostInfoExport
 
   SEARCHABLE_ACTIONS = %w[index active errors out_of_sync pending disabled]
   AJAX_REQUESTS = %w{compute_resource_selected current_parameters process_hostgroup process_taxonomy review_before_build scheduler_hint_selected interfaces}
@@ -73,7 +74,10 @@ class HostsController < ApplicationController
         # summary report text
         @report_summary = ConfigReport.summarise(@range.days.ago, @host)
       end
-      format.yaml { render :plain => @host.info.to_yaml }
+      format.yaml do
+        Foreman::ExportSecurity.apply_sensitive_download_headers(response)
+        render :plain => host_info_for_export(@host).to_yaml
+      end
       format.json
     end
   end

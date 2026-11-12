@@ -1502,4 +1502,89 @@ class Api::V2::HostsControllerTest < ActionController::TestCase
       assert_equal json_response['facet_param'], 'bar'
     end
   end
+
+  context 'F-019 sensitive ENC and inherited parameter exports' do
+    setup do
+      @secret = 'synth-enc-secret-f019-xyz'
+      @visible = 'synth-enc-visible-f019'
+      as_admin do
+        @export_host = FactoryBot.create(:host)
+        @export_host.host_parameters.create!(:name => 'synth_secret', :value => @secret, :hidden_value => true)
+        @export_host.host_parameters.create!(:name => 'synth_visible', :value => @visible, :hidden_value => false)
+        FactoryBot.create(:common_parameter, :name => 'synth_inherited_secret',
+          :value => @secret, :hidden_value => true)
+      end
+    end
+
+    test 'admin ENC export includes hidden parameters and sets no-store cache headers' do
+      get :enc, params: { :id => @export_host.to_param }
+      assert_response :success
+      data = JSON.parse(@response.body)['data']
+      assert_equal @secret, data.dig('parameters', 'synth_secret')
+      assert_equal @visible, data.dig('parameters', 'synth_visible')
+      assert_match(/no-store/, @response.headers['Cache-Control'])
+    end
+
+    test 'admin can force ENC redaction with show_hidden_parameters=false' do
+      get :enc, params: { :id => @export_host.to_param, :show_hidden_parameters => 'false' }
+      assert_response :success
+      data = JSON.parse(@response.body)['data']
+      assert_equal '*****', data.dig('parameters', 'synth_secret')
+      assert_equal @visible, data.dig('parameters', 'synth_visible')
+      refute_includes @response.body, @secret
+    end
+
+    test 'view_hosts user without edit_params gets redacted ENC' do
+      setup_user 'view', 'hosts'
+      setup_user 'view', 'params'
+      setup_user 'view', 'locations'
+      setup_user 'view', 'organizations'
+      get :enc, params: { :id => @export_host.to_param },
+        session: set_session_user.merge(:user => @one.id)
+      assert_response :success
+      data = JSON.parse(@response.body)['data']
+      assert_equal '*****', data.dig('parameters', 'synth_secret')
+      assert_equal @visible, data.dig('parameters', 'synth_visible')
+      refute_includes @response.body, @secret
+    end
+
+    test 'show_hidden_parameters=true cannot bypass redaction without edit_params' do
+      setup_user 'view', 'hosts'
+      setup_user 'view', 'params'
+      setup_user 'view', 'locations'
+      setup_user 'view', 'organizations'
+      get :enc, params: { :id => @export_host.to_param, :show_hidden_parameters => 'true' },
+        session: set_session_user.merge(:user => @one.id)
+      assert_response :success
+      refute_includes @response.body, @secret
+      assert_equal '*****', JSON.parse(@response.body).dig('data', 'parameters', 'synth_secret')
+    end
+
+    test 'inherited_parameters redacts hidden values by default' do
+      get :inherited_parameters, params: { :id => @export_host.to_param }
+      assert_response :success
+      body = @response.body
+      refute_includes body, @secret
+      params_list = JSON.parse(body)['params']
+      secret_row = params_list.find { |p| p['name'] == 'synth_inherited_secret' }
+      assert secret_row
+      assert_equal '*****', secret_row['value']
+      assert_match(/no-store/, @response.headers['Cache-Control'])
+    end
+
+    test 'inherited_parameters reveals hidden values with show_hidden_parameters and edit_params' do
+      get :inherited_parameters, params: { :id => @export_host.to_param, :show_hidden_parameters => 'true' }
+      assert_response :success
+      params_list = JSON.parse(@response.body)['params']
+      secret_row = params_list.find { |p| p['name'] == 'synth_inherited_secret' }
+      assert_equal @secret, secret_row['value']
+    end
+
+    test 'Host#info remains unredacted for operational template consumers' do
+      as_admin do
+        info = @export_host.info
+        assert_equal @secret, info.dig('parameters', 'synth_secret')
+      end
+    end
+  end
 end

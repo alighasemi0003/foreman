@@ -7,6 +7,7 @@ module Api
       include Foreman::Controller::SmartProxyAuth
       include Foreman::Controller::Parameters::Host
       include Foreman::Controller::RequestBodySizeLimit
+      include Foreman::Controller::HostInfoExport
       include ParameterAttributes
 
       wrap_parameters :host, :include => host_params_filter.accessible_attributes(parameter_filter_context) + ['compute_attributes']
@@ -177,9 +178,11 @@ module Api
 
       api :GET, "/hosts/:id/enc", N_("Get ENC values of host")
       param :id, :identifier_dottable, :required => true
+      param :show_hidden_parameters, :bool, :desc => N_("When false, redact hidden parameter values even if the user can edit parameters. Hidden values are always redacted without edit_params.")
 
       def enc
-        render :json => { :data => @host.info }
+        Foreman::ExportSecurity.apply_sensitive_download_headers(response)
+        render :json => { :data => host_info_for_export(@host) }
       end
 
       api :GET, "/hosts/:id/status/:type", N_("Get status of host")
@@ -343,8 +346,22 @@ module Api
 
       api :GET, "/hosts/:id/inherited_parameters", N_("Get all inherited parameters for a host")
       param :id, :identifier_dottable, :required => true
+      param :show_hidden_parameters, :bool, :desc => N_("Display hidden parameter values (requires edit_params)")
       def inherited_parameters
-        render :json => {params: @host.host_inherited_params_objects}, :status => :ok
+        Foreman::ExportSecurity.apply_sensitive_download_headers(response)
+        reveal = reveal_hidden_parameters_for_api?
+        payload = Foreman::ExportSecurity.serialize_parameters_for_export(
+          @host.host_inherited_params_objects,
+          reveal_hidden: reveal
+        )
+        Foreman::SecurityEvent.log(
+          event: 'HOST_INHERITED_PARAMETERS_EXPORT',
+          status: reveal ? 'SUCCESS_FULL' : 'SUCCESS_REDACTED',
+          actor: User.current&.login,
+          target: @host.to_label,
+          details: "hidden_params=#{reveal ? 'revealed' : 'redacted'}"
+        )
+        render :json => { params: payload }, :status => :ok
       end
 
       private
