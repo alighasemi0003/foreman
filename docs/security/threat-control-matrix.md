@@ -83,6 +83,7 @@
 | CTL-067 | Application-level PKCS#7 digital signatures | Custom | `docs/digital-signatures.md` | F-032 |
 | CTL-068 | CMS/PKCS#7 interoperability for signed exports | Custom | `docs/cms-pkcs7-compatibility.md` | F-033 |
 | CTL-075 | Dead-code analysis process (non-destructive) | Custom | `docs/dead-code-analysis.md` | F-036 |
+| CTL-079 | App/DB tier separation for production | Deployment | `docs/security/separated-database-deployment.md` | F-040 |
 | CTL-021 | Userdata MAC requires IP/token binding | Custom | `userdata_controller.rb` | F-012 |
 | CTL-022 | Unattended HostFinder token/IP | Native+Custom | `unattended_controller.rb` | — |
 | CTL-023 | Key-pair export reauth + passphrase POST | Custom | `key_pairs_controller.rb` | F-018 |

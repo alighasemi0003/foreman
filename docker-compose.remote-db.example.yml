@@ -1,0 +1,32 @@
+# F-040 EXAMPLE — Foreman app tier without a co-located PostgreSQL service.
+# Usage (staging/lab with an EXTERNAL DB VM or separate compose project):
+#   export DATABASE_URL='postgres://foreman_app:...@db.example.internal/foreman?pool=5&sslmode=verify-full&sslrootcert=/certs/ca.crt'
+#   docker compose -f docker-compose.yml -f docker-compose.remote-db.example.yml up -d app orchestrator worker
+#
+# Does NOT satisfy separate-server compliance by itself — the DB must run on another host/VM.
+# Never point this overlay at the live lab volume for destructive experiments.
+
+services:
+  db:
+    # Disable co-located DB when using a remote database tier.
+    profiles: ["legacy-local-db"]
+
+  app:
+    environment:
+      # Required: host must NOT be localhost/db for production acceptance.
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL to the remote PostgreSQL DSN}
+    depends_on:
+      redis-cache:
+        condition: service_started
+      redis-tasks:
+        condition: service_started
+    # Remove hard dependency on local db health when overlay is applied.
+    # (Compose merges depends_on; ensure you do not start the db profile.)
+
+  orchestrator:
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL to the remote PostgreSQL DSN}
+
+  worker:
+    environment:
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL to the remote PostgreSQL DSN}

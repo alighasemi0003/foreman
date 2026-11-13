@@ -89,3 +89,7 @@ psql "$DATABASE_URL" -f script/security/f014_stored_procedure_poc.sql
 - Literal SP + `GRANT EXECUTE` for all CRUD: **not implemented** (by design).
 - Compensating control: least-privilege ORM roles + network isolation + app RBAC.
 - See [adr-stored-procedures-vs-orm.md](adr-stored-procedures-vs-orm.md).
+
+## Related
+
+- [separated-database-deployment.md](separated-database-deployment.md) (F-040)

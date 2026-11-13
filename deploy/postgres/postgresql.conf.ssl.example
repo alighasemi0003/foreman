@@ -1,0 +1,13 @@
+# F-040 example PostgreSQL TLS settings (append/merge into postgresql.conf).
+# Place server cert/key outside the data directory with 0600 key permissions.
+
+listen_addresses = 'DB_PRIVATE_IP'   # not '*' on a public interface
+ssl = on
+ssl_cert_file = '/etc/postgresql/ssl/server.crt'
+ssl_key_file = '/etc/postgresql/ssl/server.key'
+# ssl_ca_file = '/etc/postgresql/ssl/ca.crt'   # if client certs are required
+
+# Capacity — align with F-027 app/worker budgets + headroom
+# max_connections = 100
+
+password_encryption = scram-sha-256

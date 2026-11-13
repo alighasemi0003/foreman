@@ -602,6 +602,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | Digital signatures | PKCS#7 detached on CSV export | F-032 service + optional `digital_signature=1` | Lab needs signing key/cert files | Provision org signing cert; never reuse ENCRYPTION_KEY | `docs/digital-signatures.md` | CODE | App + PKI |
 | CMS/PKCS#7 interop | Detached PEM+DER OpenSSL-verifiable | F-033 CmsInterop + `rake security:cms_pkcs7_interop` | Verified with `openssl cms` | Publish trust anchor to consumers | `docs/cms-pkcs7-compatibility.md` | CODE | App + PKI |
 | Dead code | Advisory analysis; no bulk delete | F-036 `rake security:dead_code_report` | RuboCop unused-arg cops off in todo | Manual confirmed_unused PRs only | `docs/dead-code-analysis.md` | ASSESS | App |
+| App/DB separation | Distinct VM/hosts + TLS + LP roles | F-040 architecture + remote-db example | Lab Compose co-located; SUPERUSER | Provision DB tier; no same-host PASS | `docs/security/separated-database-deployment.md` | DEPLOYMENT | Platform + DBA |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |

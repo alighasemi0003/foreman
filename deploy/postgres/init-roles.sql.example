@@ -1,0 +1,28 @@
+-- F-040 / F-014: least-privilege PostgreSQL roles for Foreman (example).
+-- Run as a DBA superuser on an EMPTY or staging database — not against lab SUPERUSER patterns in production.
+-- Replace passwords via your secret manager; do not commit real secrets.
+
+-- CREATE DATABASE foreman OWNER foreman_migrator;
+-- \c foreman
+
+CREATE ROLE foreman_migrator LOGIN PASSWORD 'CHANGE_ME_MIGRATOR' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE foreman_app LOGIN PASSWORD 'CHANGE_ME_APP' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+
+GRANT CONNECT ON DATABASE foreman TO foreman_migrator, foreman_app;
+GRANT CREATE ON DATABASE foreman TO foreman_migrator;
+
+-- PostgreSQL <= 14 often grants CREATE on schema public to PUBLIC — revoke it.
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO foreman_migrator;
+GRANT USAGE ON SCHEMA public TO foreman_app;
+
+-- After migrations (as migrator / table owner), grant DML to the app role:
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO foreman_app;
+-- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO foreman_app;
+-- ALTER DEFAULT PRIVILEGES FOR ROLE foreman_migrator IN SCHEMA public
+--   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO foreman_app;
+-- ALTER DEFAULT PRIVILEGES FOR ROLE foreman_migrator IN SCHEMA public
+--   GRANT USAGE, SELECT ON SEQUENCES TO foreman_app;
+
+-- Runtime DATABASE_URL must use foreman_app only.
+-- Migrator DSN is for CI migrate jobs exclusively.
