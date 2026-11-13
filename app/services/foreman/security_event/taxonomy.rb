@@ -21,6 +21,7 @@ module Foreman
         account_password
         session
         data_access
+        data_integrity
         security_config
         crypto_secret
         security_control_rejection
@@ -194,6 +195,21 @@ module Foreman
           category: 'crypto_secret',
           severity: 'NOTICE',
           classification: 'confidential',
+          retention_days: 365,
+          required: %w[event_id status],
+        },
+        'DIGITAL_SIGNATURE_CREATED' => {
+          category: 'data_integrity',
+          severity: 'NOTICE',
+          classification: 'internal',
+          retention_days: 365,
+          required: %w[event_id status actor],
+          notes: 'F-032 PKCS#7 signing — no key material in details',
+        },
+        'DIGITAL_SIGNATURE_FAILED' => {
+          category: 'data_integrity',
+          severity: 'WARNING',
+          classification: 'internal',
           retention_days: 365,
           required: %w[event_id status],
         },

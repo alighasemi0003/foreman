@@ -599,6 +599,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | Source distribution | No public `.rb`; no Ruby obfuscation | F-039 assessment + slim image | GPL Rails source in image | HTTP `.rb` 404; registry ACL **ASSUMED** | `docs/source-code-protection.md` | ASSESS+CODE | App + Platform |
 | DB access model | ORM + least-privilege roles (not SP-only) | F-014 ADR + privilege inventory | Lab `foreman` **SUPERUSER**; 0 app routines | Split migrator/app roles; `rake security:check_database_privileges` | `docs/security/adr-stored-procedures-vs-orm.md` | ASSESS | App + DBA |
 | Load priority under classification | Org SLO → queue/proxy shaping | F-029 policy (no speculative scheduler) | F-026/027/028 + equal Sidekiq weights | Approve availability tiers; then tune queues/proxy | `docs/load-management-policy.md` | POLICY | App + Platform |
+| Digital signatures | PKCS#7 detached on CSV export | F-032 service + optional `digital_signature=1` | Lab needs signing key/cert files | Provision org signing cert; never reuse ENCRYPTION_KEY | `docs/digital-signatures.md` | CODE | App + PKI |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |

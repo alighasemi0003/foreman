@@ -72,6 +72,8 @@ module Foreman
         'REGISTRATION_TOKEN_INVALIDATED' => 'NOTICE',
         'SENSITIVE_EXPORT' => 'NOTICE',
         'HOST_INFO_EXPORT' => 'NOTICE',
+        'DIGITAL_SIGNATURE_CREATED' => 'NOTICE',
+        'DIGITAL_SIGNATURE_FAILED' => 'WARNING',
         'SETTING_SECURITY_CHANGE' => 'NOTICE',
       }.freeze
 
