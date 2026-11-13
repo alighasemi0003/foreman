@@ -3,6 +3,11 @@ public/webpack
 .git
 .bundle
 ~
+# F-039: keep production image free of test/dev trees and local backups
+test/
+spec/
+docker-backups/
+jenkins/
 db/*.sqlite3*
 log/*.log
 log/*.log.age

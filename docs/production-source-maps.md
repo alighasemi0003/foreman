@@ -9,7 +9,8 @@ Production webpack builds emitted `.map` files under `public/webpack/` with
 unauthenticated client could retrieve maps containing original `sources` /
 `sourcesContent`.
 
-Backend source-tree protection is **F-039** (out of scope here).
+Backend source-tree protection / obfuscation assessment is **F-039**
+(`docs/source-code-protection.md`).
 
 ## Policy
 

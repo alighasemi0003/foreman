@@ -26,13 +26,25 @@ class Foreman::Middleware::BlockSourceMapsTest < ActiveSupport::TestCase
     assert_equal 404, status
   end
 
+  test 'blocks application source tree prefixes' do
+    %w[/app/models/user.rb /config/application.rb /lib/foreman.rb /db/schema.rb /test/test_helper.rb].each do |path|
+      status, = @mw.call('PATH_INFO' => path, 'REQUEST_METHOD' => 'GET')
+      assert_equal 404, status, "expected block for #{path}"
+    end
+  end
+
+  test 'blocks ruby under webpack static path' do
+    status, = @mw.call('PATH_INFO' => '/webpack/evil.rb', 'REQUEST_METHOD' => 'GET')
+    assert_equal 404, status
+  end
+
   test 'allows normal webpack js bundles' do
     status, _, body = @mw.call('PATH_INFO' => '/webpack/bundle-abc.js', 'REQUEST_METHOD' => 'GET')
     assert_equal 200, status
     assert_equal ['ok'], body
   end
 
-  test 'allows unrelated paths' do
+  test 'allows unrelated application routes' do
     status, = @mw.call('PATH_INFO' => '/users/login', 'REQUEST_METHOD' => 'GET')
     assert_equal 200, status
   end

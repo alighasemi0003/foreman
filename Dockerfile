@@ -108,7 +108,11 @@ COPY --from=builder --chown=1001:0 ${HOME}/.bundle/config ${HOME}/.bundle/config
 COPY --from=builder --chown=1001:0 ${HOME}/Gemfile.lock ${HOME}/Gemfile.lock
 COPY --from=builder --chown=1001:0 ${HOME}/vendor/ruby ${HOME}/vendor/ruby
 COPY --from=builder --chown=1001:0 ${HOME}/public ${HOME}/public
-RUN rm -rf bin/spring
+# F-039: drop non-runtime trees if present (Rails needs app/config/db/lib/…).
+# Do not remove Ruby under app/ — autoload/plugins/migrations require source.
+RUN rm -rf bin/spring test spec .git .github docker-backups jenkins coverage \
+      pkg _build .webpack_cache && \
+    find public -type f \( -name '*.map' -o -name '*.map.gz' -o -name '*.rb' -o -name '*.erb' \) -delete 2>/dev/null || true
 RUN chmod +x bin/* script/npm_install_plugins.js script/plugin_webpack_directories.rb || true
 
 RUN date -u > BUILD_TIME
