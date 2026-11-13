@@ -87,7 +87,9 @@ environment:
 
 ## F-033 / FIPS
 
-- Wire format is standard **PKCS#7/CMS detached** (F-033-ready).
+- Wire format is standard **PKCS#7/CMS detached** — see
+  [cms-pkcs7-compatibility.md](cms-pkcs7-compatibility.md) (F-033).
+- Envelope exposes **PEM and DER**; OpenSSL CLI `cms`/`smime` verifies independently.
 - Algorithms: RSA (or whatever the org cert uses) + SHA-256 via OpenSSL.
 - F-024: FIPS-validated mode is **not** claimed; use org-approved module/policy.
 

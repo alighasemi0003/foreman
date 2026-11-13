@@ -600,6 +600,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | DB access model | ORM + least-privilege roles (not SP-only) | F-014 ADR + privilege inventory | Lab `foreman` **SUPERUSER**; 0 app routines | Split migrator/app roles; `rake security:check_database_privileges` | `docs/security/adr-stored-procedures-vs-orm.md` | ASSESS | App + DBA |
 | Load priority under classification | Org SLO → queue/proxy shaping | F-029 policy (no speculative scheduler) | F-026/027/028 + equal Sidekiq weights | Approve availability tiers; then tune queues/proxy | `docs/load-management-policy.md` | POLICY | App + Platform |
 | Digital signatures | PKCS#7 detached on CSV export | F-032 service + optional `digital_signature=1` | Lab needs signing key/cert files | Provision org signing cert; never reuse ENCRYPTION_KEY | `docs/digital-signatures.md` | CODE | App + PKI |
+| CMS/PKCS#7 interop | Detached PEM+DER OpenSSL-verifiable | F-033 CmsInterop + `rake security:cms_pkcs7_interop` | Verified with `openssl cms` | Publish trust anchor to consumers | `docs/cms-pkcs7-compatibility.md` | CODE | App + PKI |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |

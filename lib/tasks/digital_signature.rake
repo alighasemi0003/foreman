@@ -32,26 +32,27 @@ namespace :security do
       File.binwrite(content, result.payload)
       File.write(sig, result.signature_pem)
       File.write(cert, result.certificate_pem)
-      # Independent OpenSSL CLI verification (CMS/PKCS#7)
-      cli = system(
-        'openssl', 'smime', '-verify',
-        '-in', sig, '-inform', 'PEM',
-        '-content', content,
-        '-CAfile', cert,
-        '-binary', '-noverify',
-        out: File::NULL, err: File::NULL
+      # Independent OpenSSL CLI verification (CMS/PKCS#7) — F-033 path preferred
+      cli = Foreman::DigitalSignature::CmsInterop.openssl_cli_verify(
+        content_path: content,
+        signature_path: sig,
+        ca_path: cert,
+        inform: 'PEM',
+        check_trust: false
       )
       puts JSON.pretty_generate(
         task: 'F-032',
         ruby_verify: ok,
         tamper_verify: tampered,
-        openssl_smime_verify: cli == true,
+        openssl_cms_verify: cli[:ok],
+        openssl_command: cli[:command],
         certificate_fingerprint_sha256: result.certificate_fingerprint_sha256,
         payload_sha256: result.payload_sha256,
         signer_subject: result.signer_subject,
-        signature_format: Foreman::DigitalSignature::SIGNATURE_FORMAT
+        signature_format: Foreman::DigitalSignature::SIGNATURE_FORMAT,
+        signature_algorithm: result.signature_algorithm
       )
-      abort('verification failed') unless ok && tampered == false && cli
+      abort('verification failed') unless ok && tampered == false && cli[:ok]
     end
   end
 end

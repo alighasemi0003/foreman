@@ -81,6 +81,7 @@
 | CTL-043 | DB least-privilege / SP architecture assessment | Custom | `docs/security/adr-stored-procedures-vs-orm.md` | F-014 |
 | CTL-061 | Classification-aware load / availability policy | Custom | `docs/load-management-policy.md` | F-029 |
 | CTL-067 | Application-level PKCS#7 digital signatures | Custom | `docs/digital-signatures.md` | F-032 |
+| CTL-068 | CMS/PKCS#7 interoperability for signed exports | Custom | `docs/cms-pkcs7-compatibility.md` | F-033 |
 | CTL-021 | Userdata MAC requires IP/token binding | Custom | `userdata_controller.rb` | F-012 |
 | CTL-022 | Unattended HostFinder token/IP | Native+Custom | `unattended_controller.rb` | — |
 | CTL-023 | Key-pair export reauth + passphrase POST | Custom | `key_pairs_controller.rb` | F-018 |

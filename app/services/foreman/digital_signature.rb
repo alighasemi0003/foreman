@@ -14,30 +14,41 @@ module Foreman
     InvalidCertificate = Class.new(Error)
 
     FORMAT = 'foreman-signed-export-v1'
-    SIGNATURE_FORMAT = 'PKCS7-DETACHED'
+    SIGNATURE_FORMAT = 'CMS-PKCS7-SignedData-DETACHED'
     FLAGS = OpenSSL::PKCS7::DETACHED | OpenSSL::PKCS7::BINARY
     DIGEST = 'SHA256'
 
     Result = Struct.new(
-      :payload, :signature_pem, :certificate_pem, :certificate_fingerprint_sha256,
-      :signer_subject, :signed_at, :payload_sha256, :digest_algorithm,
-      keyword_init: true
+      :payload, :signature_pem, :signature_der, :certificate_pem,
+      :certificate_fingerprint_sha256, :signer_subject, :signed_at,
+      :payload_sha256, :digest_algorithm, :signature_algorithm,
+      :cms_certificates_included, keyword_init: true
     ) do
       def as_export(filename:, media_type:, classification: nil)
         {
           format: FORMAT,
+          cms_profile: SIGNATURE_FORMAT,
           payload_media_type: media_type,
           payload_filename: filename,
           payload_sha256: payload_sha256,
           payload_base64: Base64.strict_encode64(payload),
           signature_format: SIGNATURE_FORMAT,
+          signature_encoding: %w[PEM DER],
           signature_pem: signature_pem,
+          signature_der_base64: Base64.strict_encode64(signature_der),
+          signature_content_type_pem: DigitalSignature::CmsInterop::CONTENT_TYPE_PEM,
+          signature_content_type_der: DigitalSignature::CmsInterop::CONTENT_TYPE_DER,
+          signature_filename_suffix: DigitalSignature::CmsInterop::FILE_EXTENSION,
           certificate_pem: certificate_pem,
           certificate_fingerprint_sha256: certificate_fingerprint_sha256,
           digest_algorithm: digest_algorithm,
+          signature_algorithm: signature_algorithm,
+          cms_certificates_included: cms_certificates_included,
           signed_at: signed_at,
           signer_subject: signer_subject,
-          classification: classification
+          classification: classification,
+          attached_content: false,
+          detached_content: true
         }
       end
     end
@@ -73,15 +84,19 @@ module Foreman
 
         pkcs7 = OpenSSL::PKCS7.sign(cert, key, bytes, [], FLAGS)
         signed_at = Time.now.utc.iso8601
+        included = Array(pkcs7.certificates).map { |c| c.subject.to_s }
         result = Result.new(
           payload: bytes,
           signature_pem: pkcs7.to_pem,
+          signature_der: pkcs7.to_der,
           certificate_pem: cert.to_pem,
           certificate_fingerprint_sha256: fingerprint(cert),
           signer_subject: cert.subject.to_s,
           signed_at: signed_at,
           payload_sha256: Digest::SHA256.hexdigest(bytes),
-          digest_algorithm: DIGEST
+          digest_algorithm: DIGEST,
+          signature_algorithm: signature_algorithm_for(key),
+          cms_certificates_included: included
         )
 
         audit_sign!(purpose: purpose, actor: actor, result: result)
@@ -92,9 +107,10 @@ module Foreman
       end
 
       # Independent verification helper (also used by tests / rake).
-      def verify(payload, signature_pem, certificate_pem: nil, trusted_certs: nil)
+      # Accepts PEM or DER PKCS#7 bytes/string.
+      def verify(payload, signature_pem_or_der, certificate_pem: nil, trusted_certs: nil)
         bytes = payload.to_s.b
-        p7 = OpenSSL::PKCS7.new(signature_pem)
+        p7 = OpenSSL::PKCS7.new(signature_pem_or_der)
         certs = Array(trusted_certs)
         if certificate_pem.present?
           certs << OpenSSL::X509::Certificate.new(certificate_pem)
@@ -111,6 +127,14 @@ module Foreman
 
       def cert_path
         ENV['FOREMAN_SIGNING_CERT_FILE'].presence
+      end
+
+      def signature_algorithm_for(key)
+        case key
+        when OpenSSL::PKey::RSA then 'rsa-sha256'
+        when OpenSSL::PKey::EC then 'ecdsa-with-SHA256'
+        else key.class.name
+        end
       end
 
       private
