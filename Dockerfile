@@ -75,6 +75,10 @@ RUN \
 RUN chmod +x script/npm_install_plugins.js script/plugin_webpack_directories.rb && \
   npm install --no-audit --no-optional && \
   ./node_modules/webpack/bin/webpack.js --config config/webpack.config.js && \
+# F-038: strip any source maps / map.gz from the public web root (even if
+# FOREMAN_WEBPACK_SOURCEMAP was set during a diagnostic build).
+  find public/webpack -type f \( -name '*.map' -o -name '*.map.gz' \) -delete && \
+  find public/assets -type f \( -name '*.map' -o -name '*.map.gz' \) -delete 2>/dev/null || true && \
 # cleanups (nulldb.rb must remain: Gemfile.lock lists activerecord-nulldb-adapter;
 # the gem is build/runtime-declared only — adapter selection still follows DATABASE_URL)
   rm -rf public/webpack/stats.json ./node_modules vendor/ruby/*/cache vendor/ruby/*/gems/*/node_modules && \

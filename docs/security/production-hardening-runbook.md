@@ -595,6 +595,7 @@ Mark each item with evidence (ticket ID / screenshot / log excerpt). **Do not in
 | FIPS / approved crypto | Validated module + policy | Assessment only (F-024) | OpenSSL 3; FIPS provider installed, **inactive**; `fips_mode=false` | Do not claim FIPS without module+policy | `docs/fips-cryptography-assessment.md` | ASSESS | App + Platform |
 | Security log severity | Six structured levels | F-030 severity on SecurityEvent | NOTICE/ALERT via payload fields | Search collector by `severity` | `docs/security-logging-severity.md` | CODE | App |
 | Security event taxonomy | Category + classification | F-031 Taxonomy policy | Proposed (not org-approved) | Search `event_category` / `data_classification` | `docs/security-event-taxonomy.md` | CODE | App |
+| Production source maps | Not publicly served | F-038 webpack+middleware+image strip | Maps were HTTP 200 | `*.map` → 404; UI loads | `docs/production-source-maps.md` | CODE | App |
 | Collector | Independent store | Enabled to SIEM | Optional overlay | Enable or SIEM drain | Collector events / SIEM | F-041/042 LAB | SecOps |
 | CAPTCHA | On for public UI | Policy | Default off | Enable if exposed | Setting + login test | DEPLOYMENT | App |
 | Rate limit | On | Default on | Setting seed-dependent | On; consider fail-closed | 429 test | CODE | App |

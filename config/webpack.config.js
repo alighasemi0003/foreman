@@ -104,7 +104,19 @@ const commonConfig = function(buildName = 'core', tsConfig = 'tsconfig.json') {
   const config = {};
 
   if (production) {
-    config.devtool = 'source-map';
+    // F-038: do not publish production source maps under /webpack by default.
+    // FOREMAN_WEBPACK_SOURCEMAP=hidden → hidden-source-map (no sourceMappingURL;
+    //   Dockerfile still strips *.map from the public web root).
+    // FOREMAN_WEBPACK_SOURCEMAP=true|source-map → full maps (local diagnostics only;
+    //   must not ship in public deploy images).
+    const mapMode = (process.env.FOREMAN_WEBPACK_SOURCEMAP || '').toLowerCase();
+    if (mapMode === 'hidden') {
+      config.devtool = 'hidden-source-map';
+    } else if (mapMode === 'true' || mapMode === 'source-map' || mapMode === '1') {
+      config.devtool = 'source-map';
+    } else {
+      config.devtool = false;
+    }
     config.optimization = {
       moduleIds: 'named',
       splitChunks: false,

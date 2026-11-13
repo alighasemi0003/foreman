@@ -250,8 +250,12 @@ module Foreman
     # Reject TRACE/TRACK/CONNECT/WebDAV and other non-application HTTP methods early.
     config.middleware.insert_before 0, Foreman::Middleware::RejectUnsafeHttpMethods
 
-    # F-028: bound request body size (Content-Length + streamed read limit).
+    # F-038: never serve production webpack/asset *.map files publicly.
     config.middleware.insert_after Foreman::Middleware::RejectUnsafeHttpMethods,
+      Foreman::Middleware::BlockSourceMaps
+
+    # F-028: bound request body size (Content-Length + streamed read limit).
+    config.middleware.insert_after Foreman::Middleware::BlockSourceMaps,
       Foreman::Middleware::RequestBodyLimit
     config.action_dispatch.rescue_responses['Foreman::HttpBodyTooLarge'] = :payload_too_large
 
