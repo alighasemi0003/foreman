@@ -1,0 +1,101 @@
+# Isolated upstream-sync verification stack (port 33003).
+# Does NOT touch foreman / final-verify / secure-fresh / offline projects.
+#
+#   unset SEED_ADMIN_PASSWORD POSTGRES_PASSWORD ENCRYPTION_KEY SECRET_KEY_BASE
+#   docker compose -p foreman50-upstream-verify \
+#     -f docker-compose.upstream-verify.yml \
+#     -f docker-compose.logging.yml \
+#     --env-file .env.upstream-verify up -d
+#
+services:
+  db:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: foreman
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: foreman
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foreman -d foreman -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - upstream_verify_db:/var/lib/postgresql/data
+
+  redis-cache:
+    image: redis:7
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-tasks:
+    image: redis:7
+    command: redis-server --appendonly yes
+    volumes:
+      - upstream_verify_redis_tasks:/data
+
+  app: &app_base
+    image: ${FOREMAN_IMAGE:?Set FOREMAN_IMAGE}
+    stop_grace_period: 30s
+    command: bash -lc 'exec bundle exec bin/rails server -b 0.0.0.0'
+    environment:
+      DATABASE_URL: postgres://foreman:${POSTGRES_PASSWORD}@db/foreman?pool=5
+      RAILS_MAX_THREADS: "5"
+      FOREMAN_PUMA_THREADS_MIN: "0"
+      FOREMAN_PUMA_THREADS_MAX: "5"
+      FOREMAN_PUMA_WORKERS: "2"
+      RAILS_ENV: production
+      FOREMAN_REQUIRE_SSL: "false"
+      FOREMAN_FQDN: upstream-verify.example.com
+      FOREMAN_DOMAIN: example.com
+      FOREMAN_RAILS_CACHE_STORE_TYPE: redis
+      FOREMAN_RAILS_CACHE_STORE_URLS: redis://redis-cache:6379/0
+      DYNFLOW_REDIS_URL: redis://redis-tasks:6379/0
+      REDIS_PROVIDER: DYNFLOW_REDIS_URL
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?Set SECRET_KEY_BASE}
+      SEED_ADMIN_USER: ${SEED_ADMIN_USER:-upadmin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-upadmin@example.local}
+      FOREMAN_APPLY_SECURE_DEFAULTS: ${FOREMAN_APPLY_SECURE_DEFAULTS:-true}
+      FOREMAN_SIGNING_ENABLED: "false"
+      FOREMAN_SECURITY_EVENTS_ENABLED: ${FOREMAN_SECURITY_EVENTS_ENABLED:-true}
+      FOREMAN_SECURITY_EVENTS_URL: ${FOREMAN_SECURITY_EVENTS_URL:-tcp://security-collector:1514}
+    hostname: upstream-verify.example.com
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      redis-tasks:
+        condition: service_started
+    ports:
+      - "127.0.0.1:33003:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  orchestrator:
+    <<: *app_base
+    command: bundle exec sidekiq -r ./extras/dynflow-sidekiq.rb -c 1 -q dynflow_orchestrator
+    hostname: orchestrator-upstream-verify.example.com
+    ports: []
+    healthcheck:
+      disable: true
+
+  worker:
+    <<: *app_base
+    command: bundle exec sidekiq -r ./extras/dynflow-sidekiq.rb -c 5 -q default,1 -q remote_execution,1
+    ports: []
+    healthcheck:
+      disable: true
+
+volumes:
+  upstream_verify_db:
+  upstream_verify_redis_tasks:
