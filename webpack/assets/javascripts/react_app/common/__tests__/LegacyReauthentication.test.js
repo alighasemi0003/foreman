@@ -282,7 +282,7 @@ describe('LegacyReauthentication adapter', () => {
         <input name="user[firstname]" value="Keep" />
         <input name="user[password]" type="password" value="Secret1!" />
         <input name="user[password_confirmation]" type="password" value="Secret1!" />
-        <input name="user[password_change_required]" type="checkbox" value="1" checked />
+        <input name="user[description]" value="preserved" />
         <button type="submit" name="commit" value="Submit">Submit</button>
       </form>`;
     const form = document.getElementById('new_user');

@@ -11,7 +11,7 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
     Setting[:require_reauth_users_change_password] = false
   end
 
-  def create_local_user!(force:)
+  def create_local_user!(force: true)
     login = "fpc#{Foreman.uuid[0..7]}"
     post :create, params: {
       user: {
@@ -20,10 +20,12 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
         auth_source_id: auth_sources(:internal).id,
         password: 'Password1!',
         password_confirmation: 'Password1!',
-        password_change_required: force,
       },
     }, session: set_session_user(@admin)
-    User.unscoped.find_by_login(login)
+    user = User.unscoped.find_by_login(login)
+    # Simulate a user who already completed mandatory first-login change.
+    user&.update_column(:password_change_required, false) unless force
+    user
   end
 
   def assert_minimal_forced_form!
@@ -48,13 +50,30 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
     assert_match(/change your password/i, flash[:warning].to_s)
   end
 
-  test 'login without force flag goes to hosts' do
+  test 'login after completed password change goes to hosts' do
     user = create_local_user!(force: false)
     refute user.password_change_required?
 
     post :login, params: { login: { login: user.login, password: 'Password1!' } }
     assert_response :redirect
     refute_equal edit_user_path(user), response.redirect_url.sub(%r{https?://[^/]+}, '')
+  end
+
+  test 'create ignores forged password_change_required false' do
+    login = "fpcforge#{Foreman.uuid[0..7]}"
+    post :create, params: {
+      user: {
+        login: login,
+        mail: "#{login}@example.com",
+        auth_source_id: auth_sources(:internal).id,
+        password: 'Password1!',
+        password_confirmation: 'Password1!',
+        password_change_required: false,
+      },
+    }, session: set_session_user(@admin)
+    user = User.unscoped.find_by_login(login)
+    assert user
+    assert user.password_change_required?
   end
 
   test 'forced user edit page uses minimal password form without tabs or notifications' do
@@ -180,18 +199,46 @@ class UsersControllerPasswordChangeRequiredTest < ActionController::TestCase
     refute_match(/change your password/i, flash[:warning].to_s)
   end
 
-  test 'admin password reset can require force change on next login' do
+  test 'admin password reset always requires force change on next login' do
     user = create_local_user!(force: false)
     put :update, params: {
       id: user.id,
       user: {
-        password: 'Password2!',
-        password_confirmation: 'Password2!',
-        password_change_required: true,
+        password: 'TempReset9!',
+        password_confirmation: 'TempReset9!',
       },
     }, session: set_session_user(@admin)
     user.reload
     assert user.password_change_required?
+    assert user.matching_password?('TempReset9!')
+  end
+
+  test 'admin cannot clear force flag via update params' do
+    user = create_local_user!(force: true)
+    put :update, params: {
+      id: user.id,
+      user: {
+        firstname: 'StillForced',
+        password_change_required: false,
+      },
+    }, session: set_session_user(@admin)
+    user.reload
+    assert_equal 'StillForced', user.firstname
+    assert user.password_change_required?
+  end
+
+  test 'non-password admin edit does not enable force change' do
+    user = create_local_user!(force: false)
+    put :update, params: {
+      id: user.id,
+      user: {
+        firstname: 'NoForce',
+        description: 'profile only',
+      },
+    }, session: set_session_user(@admin)
+    user.reload
+    assert_equal 'NoForce', user.firstname
+    refute user.password_change_required?
   end
 
   test 'forced password flow never redirects to notification_recipients' do

@@ -18,12 +18,14 @@ class UsersControllerCreateReauthenticationTest < ActionController::TestCase
         auth_source_id: auth_sources(:internal).id,
         password: 'Password1!',
         password_confirmation: 'Password1!',
-        password_change_required: true,
       }.merge(overrides),
     }
   end
 
   def stale_session
+    # Must claim active browser session (F-016) so require_login succeeds and
+    # reauthentication (not session-loss) is what blocks create.
+    @admin.claim_active_session if @admin.respond_to?(:claim_active_session)
     { user: @admin.id, expires_at: 5.minutes.from_now }
   end
 
@@ -84,21 +86,21 @@ class UsersControllerCreateReauthenticationTest < ActionController::TestCase
     assert_template :new
   end
 
-  test 'create persists password_change_required when checked' do
+  test 'create always enables mandatory password_change_required' do
     login = "forcepw#{Foreman.uuid[0..7]}"
-    post :create, params: create_params(login: login, password_change_required: true),
+    post :create, params: create_params(login: login),
                   session: set_session_user(@admin)
     user = User.unscoped.find_by_login(login)
     assert user
     assert user.password_change_required?
   end
 
-  test 'create persists password_change_required false when unchecked' do
+  test 'create ignores password_change_required false in request' do
     login = "noforce#{Foreman.uuid[0..7]}"
     post :create, params: create_params(login: login, password_change_required: false),
                   session: set_session_user(@admin)
     user = User.unscoped.find_by_login(login)
     assert user
-    refute user.password_change_required?
+    assert user.password_change_required?
   end
 end

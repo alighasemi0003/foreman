@@ -435,4 +435,41 @@ class Api::V2::UsersControllerTest < ActionController::TestCase
     end
     assert_response :unprocessable_entity
   end
+
+  test "API create enables mandatory password_change_required for local users" do
+    login = "apipcr#{Foreman.uuid[0..7]}"
+    post :create, params: {
+      user: min_valid_attrs.clone.update(login: login, mail: "#{login}@example.com"),
+    }
+    assert_response :success
+    user = User.unscoped.find_by_login(login)
+    assert user
+    assert user.password_change_required?
+  end
+
+  test "API create ignores password_change_required false" do
+    login = "apipcr0#{Foreman.uuid[0..7]}"
+    post :create, params: {
+      user: min_valid_attrs.clone.update(
+        login: login,
+        mail: "#{login}@example.com",
+        password_change_required: false
+      ),
+    }
+    assert_response :success
+    user = User.unscoped.find_by_login(login)
+    assert user
+    assert user.password_change_required?
+  end
+
+  test "API admin password reset enables password_change_required" do
+    user = FactoryBot.create(:user, :with_mail, auth_source: auth_sources(:internal))
+    refute user.password_change_required?
+    put :update, params: {
+      id: user.id,
+      user: { password: 'TempApiReset9!', password_confirmation: 'TempApiReset9!' },
+    }
+    assert_response :success
+    assert user.reload.password_change_required?
+  end
 end

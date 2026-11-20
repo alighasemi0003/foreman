@@ -15,9 +15,20 @@ FactoryBot.define do
     sequence(:login) { |n| "user#{n}" }
     organizations { [Organization.find_or_initialize_by(name: 'Organization 1')] }
     locations { [Location.find_or_initialize_by(name: 'Location 1')] }
+    # Tests create synthetic users for login/authorization; skip mandatory first-login
+    # renewal unless the :require_password_change trait is used. Clear the skip after
+    # create so later admin password resets still enforce the policy.
+    after(:build) { |user| user.skip_mandatory_password_change = true }
+    after(:create) { |user| user.skip_mandatory_password_change = nil }
 
     trait :admin do
       admin { true }
+    end
+
+    trait :require_password_change do
+      after(:build) { |user| user.skip_mandatory_password_change = false }
+      after(:create) { |user| user.skip_mandatory_password_change = nil }
+      password_change_required { true }
     end
 
     trait :with_mail do
