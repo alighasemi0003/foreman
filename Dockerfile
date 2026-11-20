@@ -47,8 +47,8 @@ WORKDIR $HOME
 # Ruby dependency manifests only — cache this layer across app/source edits
 COPY --chown=1001:0 Gemfile Gemfile.lock ${HOME}/
 COPY --chown=1001:0 bundler.d ${HOME}/bundler.d
-# Prefer vendored gems when present (e.g. safemode 2.0.1 for CVE-2026-96658)
-COPY --chown=1001:0 vendor/cache ${HOME}/vendor/cache
+# Do not COPY an incomplete vendor/cache here — Bundler would refuse network
+# installs. safemode >= 2.0.1 is pinned in Gemfile.lock (CVE-2026-96658).
 RUN test -f ${HOME}/Gemfile.lock && \
   bundle config set --local without "${BUNDLER_SKIPPED_GROUPS}" && \
   bundle config set --local clean true && \

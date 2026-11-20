@@ -1,0 +1,5 @@
+# Overlay: keep security-collector on the Docker network only (no host publish).
+# Avoids collisions with other stacks on 1514/1515.
+services:
+  security-collector:
+    ports: !override []
