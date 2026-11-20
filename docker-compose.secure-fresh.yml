@@ -1,7 +1,7 @@
 # Fresh-install secure-by-default verification stack.
 # Isolated project + volumes — does NOT touch foreman50-final-verify.
 #
-#   cp .env.secure-fresh.example .env.secure-fresh   # fill secrets
+#   cp config/env.secure-fresh.example .env.secure-fresh   # fill secrets
 #   docker compose -p foreman50-secure-fresh \
 #     -f docker-compose.secure-fresh.yml \
 #     -f docker-compose.logging.yml \

@@ -60,6 +60,7 @@ bundle exec rake security:secure_defaults APPLY=1 FORCE=1
 - Lab HTTP: `FOREMAN_REQUIRE_SSL=false` (explicit; not production-safe)
 - Production: `FOREMAN_REQUIRE_SSL=true` behind TLS
 - Fresh secure profile: `docker-compose.secure-fresh.yml` (+ optional `docker-compose.logging.yml`)
+- Env template: `config/env.secure-fresh.example` → copy to `.env.secure-fresh`
 - Redis cache is a hard dependency when fail-closed rate limiting is enabled
 
 ## Infrastructure-dependent controls
