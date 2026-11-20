@@ -16,10 +16,10 @@ class ForemanCaptchaTest < ActiveSupport::TestCase
     SETTINGS[:captcha] = @prev_ttl.nil? ? nil : { ttl_seconds: @prev_ttl }
   end
 
-  test 'captcha_enabled setting defaults to false' do
+  test 'captcha_enabled setting defaults to true' do
     definition = Foreman.settings.find('captcha_enabled')
     assert_not_nil definition
-    assert_equal false, definition.default
+    assert_equal true, definition.default
     assert_equal 'auth', definition.category
   end
 

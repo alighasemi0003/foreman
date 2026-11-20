@@ -72,13 +72,13 @@ Foreman::SettingManager.define(:foreman) do
       full_name: N_('HTTP rate limit — general'))
     setting('http_rate_limit_fail_closed',
       type: :boolean,
-      description: N_("When rate-limit storage (Rails.cache) is unavailable: if true, reject requests with HTTP 429; if false (default), fail open and log HTTP_RATE_LIMIT_FAIL_OPEN so automation remains available."),
-      default: false,
+      description: N_("When rate-limit storage (Rails.cache) is unavailable: if true, reject requests with HTTP 429; if false, fail open and log HTTP_RATE_LIMIT_FAIL_OPEN. Secure-by-default installs use true and require a healthy Redis cache."),
+      default: true,
       full_name: N_('HTTP rate limit fail closed'))
     setting('captcha_enabled',
       type: :boolean,
       description: N_("Require an offline CAPTCHA challenge for interactive password logins. The challenge is generated and verified entirely on the Foreman server (no external network)."),
-      default: false,
+      default: true,
       full_name: N_('Login CAPTCHA'))
     setting('account_lockout_attempts',
       type: :integer,
@@ -184,7 +184,7 @@ Foreman::SettingManager.define(:foreman) do
     setting('idle_timeout',
       type: :integer,
       description: N_("Log out idle users after a certain number of minutes"),
-      default: 60,
+      default: 30,
       full_name: N_('Idle timeout'))
     setting('login_history_limit',
       type: :integer,
@@ -194,7 +194,7 @@ Foreman::SettingManager.define(:foreman) do
     setting('password_max_age',
       type: :integer,
       description: N_("Maximum age in days for locally managed (internal) passwords before renewal is required. Set to 0 to disable password expiration. Does not apply to LDAP or external authentication providers."),
-      default: 0,
+      default: 90,
       full_name: N_('Password maximum age (days)'))
     validates('password_max_age',
       ->(value) { value.to_i.between?(0, 3650) },

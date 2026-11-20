@@ -109,5 +109,10 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Attach proposed information-classification labels to supported exports, downloads and printable pages (HTTP headers, YAML comments, print banner). Does not replace access control or F-019 redaction."),
       default: true,
       full_name: N_('Label classified outputs'))
+    setting('security_hardening_baseline',
+      type: :string,
+      description: N_("Internal marker recording which security-hardening baseline was applied at first install. Do not edit unless directed by an upgrade procedure."),
+      default: '',
+      full_name: N_('Security hardening baseline'))
   end
 end
