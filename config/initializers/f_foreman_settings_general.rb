@@ -114,5 +114,12 @@ Foreman::SettingManager.define(:foreman) do
       description: N_("Internal marker recording which security-hardening baseline was applied at first install. Do not edit unless directed by an upgrade procedure."),
       default: '',
       full_name: N_('Security hardening baseline'))
+    setting('report_auto_gzip_threshold',
+      type: :integer,
+      description: N_('Report results above this size (in MiB) are automatically compressed with gzip before storage. Set to 0 to always compress. Maximum value is 512.'),
+      default: 256,
+      full_name: N_('Report auto gzip threshold (MiB)'))
+    validates('report_auto_gzip_threshold', ->(value) { value.is_a?(Integer) && value >= 0 && value <= 512 },
+      message: N_("must be between 0 and 512 MiB"))
   end
 end

@@ -34,6 +34,9 @@ module Api
       param_group :personal_access_token, :as => :create
 
       def create
+        # Upstream CVE-2026-86322/86323: authorize target user before create (IDOR).
+        # Custom hardening: require reauthentication for token issuance.
+        return not_found unless find_authorized_user(:edit_users)
         return unless ensure_reauthenticated!('personal_access_tokens.create')
 
         @personal_access_token = PersonalAccessToken.new(personal_access_token_params.merge(:user => @user))

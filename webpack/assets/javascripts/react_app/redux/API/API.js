@@ -24,10 +24,11 @@ axios.interceptors.request.use(config => {
 });
 
 export default {
-  get(url, headers = {}, params = {}) {
+  get(url, headers = {}, params = {}, config = {}) {
     return axios.get(foremanUrl(url), {
       headers,
       params,
+      ...config,
     });
   },
   put(url, data = {}, headers = {}) {

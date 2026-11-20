@@ -21,7 +21,8 @@ gem 'deep_cloneable', '>= 3', '< 4'
 gem 'validates_lengths_from_database', '~> 0.5'
 gem 'friendly_id', '>= 5.4.2', '< 6'
 gem 'secure_headers', '>= 6.3', '< 8'
-gem 'safemode', '>= 2.0', '< 3'
+# CVE-2026-96658: Safemode bypass RCE — require 2.0.1+
+gem 'safemode', '>= 2.0.1', '< 3'
 gem 'fast_gettext', '~> 2.1'
 gem 'gettext_i18n_rails', '~> 1.8'
 gem 'rails-i18n', '~> 7.0'
@@ -47,6 +48,7 @@ gem 'rack-cors', '~> 1.1', require: 'rack/cors'
 gem 'jwt', '>= 2.2.2', '< 3.0'
 gem 'graphql', '~> 1.13.0'
 gem 'graphql-batch'
+gem 'json', '< 3' # Drop for Rails 8.1
 
 # A bundled gem since Ruby 3.0
 gem 'rss'

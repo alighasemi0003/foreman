@@ -23,6 +23,8 @@ function escapeHtmlAttr(text) {
 }
 
 function setItemStatus(item, response) {
+  // Keep XSS-safe attribute escaping and warning styling; upstream removed
+  // Smart Proxy version-mismatch handling in a separate code path.
   if (response.success && response.message && response.message.warning) {
     item.attr('title', escapeHtmlAttr(response.message.warning.message));
     item.addClass('text-warning');

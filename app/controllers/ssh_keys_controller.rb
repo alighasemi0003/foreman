@@ -9,6 +9,8 @@ class SshKeysController < ApplicationController
   end
 
   def create
+    # Upstream CVE-2026-86324 + custom reauthentication.
+    return not_found unless find_authorized_user(:edit_users)
     return unless ensure_reauthenticated!('ssh_keys.create')
 
     @ssh_key = SshKey.new(ssh_key_params.merge(:user => @user))

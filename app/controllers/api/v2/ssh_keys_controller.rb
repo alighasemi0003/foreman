@@ -34,6 +34,9 @@ module Api
       param_group :ssh_key, :as => :create
 
       def create
+        # Upstream CVE-2026-86324: authorize target user before create (IDOR).
+        # Custom hardening: require reauthentication for SSH key create.
+        return not_found unless find_authorized_user(:edit_users)
         return unless ensure_reauthenticated!('ssh_keys.create')
 
         @ssh_key = SshKey.new(ssh_key_params.merge(:user => @user))
