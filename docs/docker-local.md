@@ -77,7 +77,11 @@ See `docs/security/centralized-security-events.md` and
 ## 5. Create first admin (seed)
 
 Prefer seeding **after** the app has booted once (settings registry must be loaded).
-`db:seed` alone right after migrate can fail on `bcrypt_cost` setting registration.
+`db:seed` alone right after migrate used to fail on `bcrypt_cost` setting
+registration; `010-calibrate_bcrypt_cost.rb` now skips until the definition
+exists. `SEED_ADMIN_PASSWORD` must meet password complexity (letter, number,
+special character, length ≥ 8). Avoid `$` in `.env` password values (Compose
+variable expansion).
 
 ```bash
 docker compose exec app bundle exec rake db:seed
