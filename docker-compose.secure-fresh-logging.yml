@@ -1,0 +1,5 @@
+# Overlay on top of docker-compose.logging.yml for secure-fresh:
+# keep collector on the Docker network only (avoid host port collisions).
+services:
+  security-collector:
+    ports: !override []
