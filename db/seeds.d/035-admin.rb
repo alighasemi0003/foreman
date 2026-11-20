@@ -54,6 +54,9 @@ elsif User.unscoped.only_admin.except_hidden.none?
         :mail      => (ENV['SEED_ADMIN_EMAIL'] || Setting[:administrator]).try(:dup))
       user.admin = true
       user.auth_source = src_internal
+      # Bootstrap first interactive admin must remain usable after seed; operators
+      # set SEED_ADMIN_PASSWORD. Subsequent local users still get mandatory renewal.
+      user.skip_mandatory_password_change = true
       user.locale = ENV['SEED_ADMIN_LOCALE'] if ENV['SEED_ADMIN_LOCALE'].present?
       user.timezone = ENV['SEED_ADMIN_TIMEZONE'] if ENV['SEED_ADMIN_TIMEZONE'].present?
       if ENV['SEED_ADMIN_PASSWORD'].present?

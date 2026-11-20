@@ -33,6 +33,10 @@ class User < ApplicationRecord
 
   attribute :password
 
+  # Trusted bootstrap / test factories may opt out of mandatory first-login renewal.
+  # Interactive admin UI and API creation must never set this.
+  attr_accessor :skip_mandatory_password_change
+
   before_validation :sanitize_password_change_required
   after_save :ensure_default_role
 
@@ -928,7 +932,32 @@ class User < ApplicationRecord
 
   def sanitize_password_change_required
     # External / LDAP / OIDC users cannot change password in Foreman — never force.
-    self.password_change_required = false unless auth_source&.can_set_password?
-    self.password_change_required = !!password_change_required
+    unless auth_source&.can_set_password?
+      self.password_change_required = false
+      return
+    end
+
+    # Seeds, fixtures helpers, and FactoryBot may opt out explicitly.
+    return if skip_mandatory_password_change
+
+    # Every newly created INTERNAL (local-password) user must change the initial password.
+    if new_record?
+      self.password_change_required = true
+      return
+    end
+
+    # Administrator (or other non-self actor) assigning a temporary password forces renewal.
+    # Runs before prepare_password, so detect via the plaintext password attribute (not hash).
+    if password.present?
+      editing_self = User.current.present? && User.current.id == id
+      self.password_change_required = true unless editing_self
+      return
+    end
+
+    # Ignore mass-assignment / forged attempts to clear the flag without a completed change.
+    # Successful self-service clear uses update_column (bypasses this callback).
+    if will_save_change_to_password_change_required? && !password_change_required
+      self.password_change_required = attribute_in_database(:password_change_required)
+    end
   end
 end
